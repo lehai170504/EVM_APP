@@ -1,15 +1,17 @@
-import api from './api';
+import api from "./api";
 
 export const deliveryService = {
   getDeliveries: async (orderId) => {
-    const response = await api.get('/deliveries', {
-      params: orderId ? { order: orderId } : {}
+    const response = await api.get("/deliveries", {
+      params: orderId ? { order: orderId } : {},
     });
-    return Array.isArray(response.data) ? response.data : (response.data?.data || []);
+    return Array.isArray(response.data)
+      ? response.data
+      : response.data?.data || [];
   },
 
   createDelivery: async (data) => {
-    const response = await api.post('/deliveries', data);
+    const response = await api.post("/deliveries", data);
     return response.data;
   },
 
@@ -18,4 +20,3 @@ export const deliveryService = {
     return response.data;
   },
 };
-

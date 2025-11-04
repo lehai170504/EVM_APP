@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { theme } from '../theme';
+import React from "react";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { theme } from "../theme";
 
 export const LoadingScreen = () => {
   return (
@@ -13,9 +13,8 @@ export const LoadingScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: theme.colors.background,
   },
 });
-

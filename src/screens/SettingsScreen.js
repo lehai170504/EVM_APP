@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,29 +7,28 @@ import {
   TouchableOpacity,
   Alert,
   Animated,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../context/AuthContext';
-import { Card } from '../components/Card';
-import { Input } from '../components/Input';
-import { Button } from '../components/Button';
-import { Loading } from '../components/Loading';
-import { theme } from '../theme';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { authService } from '../services/authService';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../context/AuthContext";
+import { Card } from "../components/Card";
+import { Input } from "../components/Input";
+import { Button } from "../components/Button";
+import { theme } from "../theme";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { authService } from "../services/authService";
 
 const SettingsScreen = () => {
   const { user, logout, updateUser } = useAuth();
   const navigation = useNavigation();
   const [profile, setProfile] = useState({
-    name: user?.profile?.name || '',
-    phone: user?.profile?.phone || '',
+    name: user?.profile?.name || "",
+    phone: user?.profile?.phone || "",
   });
   const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
   const [loading, setLoading] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -51,25 +50,27 @@ const SettingsScreen = () => {
   }, []);
 
   const getInitials = (name) => {
-    if (!name) return 'U';
+    if (!name) return "U";
     return name
-      .split(' ')
+      .split(" ")
       .map((n) => n[0])
-      .join('')
+      .join("")
       .toUpperCase()
       .substring(0, 2);
   };
 
-  const userName = user?.profile?.name || user?.email || 'User';
+  const userName = user?.profile?.name || user?.email || "User";
 
   const handleUpdateProfile = async () => {
     setLoading(true);
     try {
       const result = await authService.updateProfile(profile);
       updateUser(result.user);
-      alert('Cập nhật thông tin thành công');
+      alert("Cập nhật thông tin thành công");
     } catch (error) {
-      alert('Cập nhật thất bại: ' + (error.response?.data?.message || error.message));
+      alert(
+        "Cập nhật thất bại: " + (error.response?.data?.message || error.message)
+      );
     } finally {
       setLoading(false);
     }
@@ -77,12 +78,12 @@ const SettingsScreen = () => {
 
   const handleChangePassword = async () => {
     if (!passwordForm.currentPassword || !passwordForm.newPassword) {
-      alert('Vui lòng nhập đầy đủ thông tin');
+      alert("Vui lòng nhập đầy đủ thông tin");
       return;
     }
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert('Mật khẩu mới không khớp');
+      alert("Mật khẩu mới không khớp");
       return;
     }
 
@@ -92,82 +93,91 @@ const SettingsScreen = () => {
         passwordForm.currentPassword,
         passwordForm.newPassword
       );
-      alert('Đổi mật khẩu thành công');
+      alert("Đổi mật khẩu thành công");
       setPasswordForm({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
       });
     } catch (error) {
-      alert('Đổi mật khẩu thất bại: ' + (error.response?.data?.message || error.message));
+      alert(
+        "Đổi mật khẩu thất bại: " +
+          (error.response?.data?.message || error.message)
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Đăng xuất',
-      'Bạn có chắc chắn muốn đăng xuất?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đăng xuất',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Login' }],
-            });
-          },
+    Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất?", [
+      { text: "Hủy", style: "cancel" },
+      {
+        text: "Đăng xuất",
+        style: "destructive",
+        onPress: async () => {
+          await logout();
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "Login" }],
+          });
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <ScrollView 
-        style={styles.scrollView} 
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
+      <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Header */}
-        <Animated.View 
+        <Animated.View
           style={{
             opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }]
+            transform: [{ translateY: slideAnim }],
           }}
         >
           <Card style={styles.profileCard}>
             <View style={styles.profileHeader}>
-            <View style={styles.avatarContainer}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{getInitials(userName)}</Text>
+              <View style={styles.avatarContainer}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{getInitials(userName)}</Text>
+                </View>
+                <View style={styles.onlineIndicator} />
               </View>
-              <View style={styles.onlineIndicator} />
+              <Text style={styles.profileName}>{userName}</Text>
+              <Text style={styles.profileEmail}>{user?.email}</Text>
+              <View style={styles.roleBadge}>
+                <Ionicons
+                  name="briefcase-outline"
+                  size={14}
+                  color={theme.colors.primary}
+                />
+                <Text style={styles.roleText}>
+                  {user?.role === "DealerStaff"
+                    ? "Nhân viên bán hàng"
+                    : user?.role || "User"}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.profileName}>{userName}</Text>
-            <Text style={styles.profileEmail}>{user?.email}</Text>
-            <View style={styles.roleBadge}>
-              <Ionicons name="briefcase-outline" size={14} color={theme.colors.primary} />
-              <Text style={styles.roleText}>
-                {user?.role === 'DealerStaff' ? 'Nhân viên bán hàng' : user?.role || 'User'}
-              </Text>
-            </View>
-          </View>
           </Card>
         </Animated.View>
 
         {/* Account Settings Section */}
-        <Animated.View 
+        <Animated.View
           style={[
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
           ]}
         >
           <View style={styles.sectionHeader}>
-            <Ionicons name="person-circle-outline" size={20} color={theme.colors.primary} />
+            <Ionicons
+              name="person-circle-outline"
+              size={20}
+              color={theme.colors.primary}
+            />
             <Text style={styles.sectionTitle}>Thông tin tài khoản</Text>
           </View>
           <Card style={styles.sectionCard}>
@@ -196,13 +206,17 @@ const SettingsScreen = () => {
         </Animated.View>
 
         {/* Security Section */}
-        <Animated.View 
+        <Animated.View
           style={[
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
           ]}
         >
           <View style={styles.sectionHeader}>
-            <Ionicons name="lock-closed-outline" size={20} color={theme.colors.primary} />
+            <Ionicons
+              name="lock-closed-outline"
+              size={20}
+              color={theme.colors.primary}
+            />
             <Text style={styles.sectionTitle}>Bảo mật</Text>
           </View>
           <Card style={styles.sectionCard}>
@@ -245,9 +259,9 @@ const SettingsScreen = () => {
         </Animated.View>
 
         {/* Logout Section */}
-        <Animated.View 
+        <Animated.View
           style={[
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
           ]}
         >
           <TouchableOpacity
@@ -257,10 +271,18 @@ const SettingsScreen = () => {
           >
             <View style={styles.logoutContent}>
               <View style={styles.logoutIconContainer}>
-                <Ionicons name="log-out-outline" size={24} color={theme.colors.error} />
+                <Ionicons
+                  name="log-out-outline"
+                  size={24}
+                  color={theme.colors.error}
+                />
               </View>
               <Text style={styles.logoutText}>Đăng xuất</Text>
-              <Ionicons name="chevron-forward" size={20} color={theme.colors.textTertiary} />
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.textTertiary}
+              />
             </View>
           </TouchableOpacity>
         </Animated.View>
@@ -283,18 +305,18 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: theme.spacing.lg,
-    paddingBottom: theme.spacing['3xl'],
+    paddingBottom: theme.spacing["3xl"],
   },
   // Profile Section
   profileCard: {
     marginBottom: theme.spacing.xl,
   },
   profileHeader: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: theme.spacing.xl,
   },
   avatarContainer: {
-    position: 'relative',
+    position: "relative",
     marginBottom: theme.spacing.md,
   },
   avatar: {
@@ -302,17 +324,17 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     ...theme.shadow.md,
   },
   avatarText: {
-    fontSize: theme.typography.fontSize['2xl'],
+    fontSize: theme.typography.fontSize["2xl"],
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.textWhite,
   },
   onlineIndicator: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 4,
     right: 4,
     width: 20,
@@ -323,7 +345,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.background,
   },
   profileName: {
-    fontSize: theme.typography.fontSize['2xl'],
+    fontSize: theme.typography.fontSize["2xl"],
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.xs / 2,
@@ -334,9 +356,9 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   roleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary + '15',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.primary + "15",
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.xs,
     borderRadius: theme.borderRadius.full,
@@ -349,8 +371,8 @@ const styles = StyleSheet.create({
   },
   // Section Styles
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.spacing.sm,
     marginBottom: theme.spacing.md,
     marginTop: theme.spacing.lg,
@@ -372,12 +394,12 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.xl,
     marginTop: theme.spacing.lg,
     marginBottom: theme.spacing.md,
-    overflow: 'hidden',
+    overflow: "hidden",
     ...theme.shadow.card,
   },
   logoutContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: theme.spacing.lg,
     gap: theme.spacing.md,
   },
@@ -385,9 +407,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.error + '15',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: theme.colors.error + "15",
+    justifyContent: "center",
+    alignItems: "center",
   },
   logoutText: {
     flex: 1,
@@ -397,7 +419,7 @@ const styles = StyleSheet.create({
   },
   // Footer
   footer: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: theme.spacing.xl,
   },
   footerText: {
@@ -407,4 +429,3 @@ const styles = StyleSheet.create({
 });
 
 export default SettingsScreen;
-

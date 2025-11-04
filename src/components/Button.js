@@ -1,12 +1,17 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { theme } from '../theme';
+import React from "react";
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
+import { theme } from "../theme";
 
 export const Button = ({
   title,
   onPress,
-  variant = 'primary',
-  size = 'md',
+  variant = "primary",
+  size = "md",
   disabled = false,
   loading = false,
   style,
@@ -37,7 +42,7 @@ export const Button = ({
   // Ensure disabled and loading are proper booleans
   const isDisabled = Boolean(disabled) || Boolean(loading);
   const isLoading = Boolean(loading);
-  
+
   return (
     <TouchableOpacity
       style={getButtonStyle()}
@@ -47,7 +52,11 @@ export const Button = ({
     >
       {isLoading ? (
         <ActivityIndicator
-          color={variant === 'primary' ? theme.colors.textWhite : theme.colors.primary}
+          color={
+            variant === "primary"
+              ? theme.colors.textWhite
+              : theme.colors.primary
+          }
           size="small"
         />
       ) : (
@@ -60,15 +69,15 @@ export const Button = ({
 const styles = StyleSheet.create({
   button: {
     borderRadius: theme.borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     ...theme.shadow.sm,
   },
   button_primary: {
     backgroundColor: theme.colors.primary,
   },
   button_secondary: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderWidth: 1,
     borderColor: theme.colors.primary,
   },
@@ -99,7 +108,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   fullWidth: {
-    width: '100%',
+    width: "100%",
   },
   text: {
     fontWeight: theme.typography.fontWeight.semibold,
@@ -130,4 +139,3 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.lg,
   },
 });
-

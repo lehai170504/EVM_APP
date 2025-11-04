@@ -1,9 +1,11 @@
-import api from './api';
+import api from "./api";
 
 export const quoteService = {
   getQuotes: async () => {
-    const response = await api.get('/quotes');
-    return Array.isArray(response.data) ? response.data : (response.data?.data || []);
+    const response = await api.get("/quotes");
+    return Array.isArray(response.data)
+      ? response.data
+      : response.data?.data || [];
   },
 
   getQuoteById: async (id) => {
@@ -12,7 +14,7 @@ export const quoteService = {
   },
 
   createQuote: async (data) => {
-    const response = await api.post('/quotes', data);
+    const response = await api.post("/quotes", data);
     return response.data;
   },
 
@@ -26,4 +28,3 @@ export const quoteService = {
     return response.data;
   },
 };
-

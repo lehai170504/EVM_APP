@@ -8,7 +8,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { customerService } from "../../services/customerService";
+import { testDriveService } from "../../services/testDrivesService";
 import { Card } from "../../components/Card";
 import { Loading } from "../../components/Loading";
 import { Button } from "../../components/Button";
@@ -17,38 +17,41 @@ import { theme } from "../../theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
-const CustomersScreen = () => {
-  const [customers, setCustomers] = useState([]);
-  const [filteredCustomers, setFilteredCustomers] = useState([]);
+const TestDrivesScreen = () => {
+  const [testDrives, setTestDrives] = useState([]);
+  const [filteredTestDrives, setFilteredTestDrives] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const navigation = useNavigation();
 
   useEffect(() => {
-    loadCustomers();
+    loadTestDrives();
   }, []);
 
   useEffect(() => {
     if (searchQuery) {
-      const filtered = customers.filter(
-        (c) =>
-          c.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          c.phone?.includes(searchQuery)
+      const filtered = testDrives.filter(
+        (t) =>
+          t.customer?.fullName
+            ?.toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          t.customer?.phone?.includes(searchQuery) ||
+          t.dealer?.name?.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredCustomers(filtered);
+      setFilteredTestDrives(filtered);
     } else {
-      setFilteredCustomers(customers);
+      setFilteredTestDrives(testDrives);
     }
-  }, [searchQuery, customers]);
+  }, [searchQuery, testDrives]);
 
-  const loadCustomers = async () => {
+  const loadTestDrives = async () => {
     try {
-      const data = await customerService.getCustomers();
-      setCustomers(data);
-      setFilteredCustomers(data);
+      const data = await testDriveService.getAll();
+      setTestDrives(data);
+      setFilteredTestDrives(data);
     } catch (error) {
-      console.error("Load customers error:", error);
+      console.error("Load test drives error:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -57,23 +60,40 @@ const CustomersScreen = () => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadCustomers();
+    loadTestDrives();
   };
 
-  const renderCustomer = ({ item }) => {
+  const renderTestDrive = ({ item }) => {
     return (
       <TouchableOpacity
         onPress={() =>
-          navigation.navigate("CustomerDetail", { customerId: item._id })
+          navigation.navigate("TestDriveDetail", { testDriveId: item._id })
         }
       >
-        <Card style={styles.customerCard}>
-          <View style={styles.customerHeader}>
-            <View style={styles.customerInfo}>
-              <Text style={styles.customerName}>{item.fullName}</Text>
-              <Text style={styles.customerPhone}>{item.phone}</Text>
-              {item.email && (
-                <Text style={styles.customerEmail}>{item.email}</Text>
+        <Card style={styles.card}>
+          <View style={styles.rowBetween}>
+            <View style={styles.infoContainer}>
+              <Text style={styles.customerName}>
+                {item.customer?.fullName || "Không rõ tên"}
+              </Text>
+              <Text style={styles.customerPhone}>{item.customer?.phone}</Text>
+              <Text style={styles.dealerText}>
+                Đại lý: {item.dealer?.name || "Không rõ"}
+              </Text>
+              <Text style={styles.variantText}>
+                Phiên bản: {item.variant?.trim || "N/A"}
+              </Text>
+              <Text style={styles.timeText}>
+                Thời gian:{" "}
+                {new Date(item.preferredTime).toLocaleString("vi-VN")}
+              </Text>
+              <Text style={[styles.status, styles[`status_${item.status}`]]}>
+                Trạng thái: {item.status}
+              </Text>
+              {item.result?.feedback && (
+                <Text style={styles.feedback}>
+                  💬 Phản hồi: {item.result.feedback}
+                </Text>
               )}
             </View>
             <Ionicons
@@ -96,24 +116,24 @@ const CustomersScreen = () => {
       <View style={styles.header}>
         <View style={styles.searchContainer}>
           <Input
-            placeholder="Tìm kiếm khách hàng..."
+            placeholder="Tìm kiếm lịch lái thử..."
             value={searchQuery}
             onChangeText={setSearchQuery}
             style={styles.searchInput}
           />
         </View>
-        <Button
-          title="Thêm khách hàng"
+        {/* <Button
+          title="Tạo lịch lái thử"
           variant="primary"
           size="md"
-          onPress={() => navigation.navigate("CreateCustomer")}
+          onPress={() => navigation.navigate("CreateTestDrive")}
           style={styles.createButton}
-        />
+        /> */}
       </View>
 
       <FlatList
-        data={filteredCustomers}
-        renderItem={renderCustomer}
+        data={filteredTestDrives}
+        renderItem={renderTestDrive}
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContent}
         refreshControl={
@@ -125,16 +145,16 @@ const CustomersScreen = () => {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons
-              name="people-outline"
+              name="car-outline"
               size={64}
               color={theme.colors.textTertiary}
             />
-            <Text style={styles.emptyText}>Chưa có khách hàng nào</Text>
+            <Text style={styles.emptyText}>Chưa có lịch lái thử nào</Text>
             <Button
-              title="Thêm khách hàng đầu tiên"
+              title="Tạo lịch lái thử đầu tiên"
               variant="outline"
               size="md"
-              onPress={() => navigation.navigate("CreateCustomer")}
+              onPress={() => navigation.navigate("CreateTestDrive")}
               style={styles.emptyButton}
             />
           </View>
@@ -158,41 +178,57 @@ const styles = StyleSheet.create({
   searchContainer: {
     marginBottom: theme.spacing.md,
   },
-  searchInput: {
-    marginBottom: 0,
-  },
   createButton: {
     marginBottom: 0,
   },
   listContent: {
     padding: theme.spacing.lg,
   },
-  customerCard: {
+  card: {
     marginBottom: theme.spacing.md,
   },
-  customerHeader: {
+  rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  customerInfo: {
+  infoContainer: {
     flex: 1,
   },
   customerName: {
     fontSize: theme.typography.fontSize.lg,
     fontWeight: theme.typography.fontWeight.semibold,
     color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.xs,
   },
   customerPhone: {
     fontSize: theme.typography.fontSize.base,
     color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.xs,
   },
-  customerEmail: {
-    fontSize: theme.typography.fontSize.sm,
+  dealerText: {
+    fontSize: theme.typography.fontSize.base,
     color: theme.colors.textSecondary,
   },
+  variantText: {
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary,
+  },
+  timeText: {
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary,
+  },
+  feedback: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textPrimary,
+    marginTop: theme.spacing.xs,
+  },
+  status: {
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: theme.typography.fontWeight.medium,
+    marginTop: theme.spacing.xs,
+  },
+  status_done: { color: "green" },
+  status_confirmed: { color: "#007AFF" },
+  status_requested: { color: "#FF9500" },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
@@ -209,4 +245,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CustomersScreen;
+export default TestDrivesScreen;

@@ -1,9 +1,11 @@
-import api from './api';
+import api from "./api";
 
 export const customerService = {
   getCustomers: async () => {
-    const response = await api.get('/customers');
-    return Array.isArray(response.data) ? response.data : (response.data?.data || []);
+    const response = await api.get("/customers");
+    return Array.isArray(response.data)
+      ? response.data
+      : response.data?.data || [];
   },
 
   getCustomerById: async (id) => {
@@ -12,7 +14,7 @@ export const customerService = {
   },
 
   createCustomer: async (data) => {
-    const response = await api.post('/customers', data);
+    const response = await api.post("/customers", data);
     return response.data;
   },
 
@@ -21,4 +23,3 @@ export const customerService = {
     return response.data;
   },
 };
-

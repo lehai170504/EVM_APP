@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,19 +8,20 @@ import {
   Modal,
   FlatList,
   TextInput,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { quoteService } from '../../services/quoteService';
-import { customerService } from '../../services/customerService';
-import { vehicleService } from '../../services/vehicleService';
-import { promotionService } from '../../services/promotionService';
-import { Card } from '../../components/Card';
-import { Loading } from '../../components/Loading';
-import { Input } from '../../components/Input';
-import { Button } from '../../components/Button';
-import { theme } from '../../theme';
-import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { quoteService } from "../../services/quoteService";
+import { customerService } from "../../services/customerService";
+import { vehicleService } from "../../services/vehicleService";
+import { promotionService } from "../../services/promotionService";
+import { Card } from "../../components/Card";
+import { Loading } from "../../components/Loading";
+import { Input } from "../../components/Input";
+import { Button } from "../../components/Button";
+import { theme } from "../../theme";
+import { Ionicons } from "@expo/vector-icons";
+import { format } from "date-fns";
+import { showMessage } from "react-native-flash-message";
 
 const CreateQuoteScreen = ({ navigation }) => {
   const [customers, setCustomers] = useState([]);
@@ -34,12 +35,14 @@ const CreateQuoteScreen = ({ navigation }) => {
   const [colorModalVisible, setColorModalVisible] = useState({});
   const [promotionModalVisible, setPromotionModalVisible] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
-  
-  const [items, setItems] = useState([{ variant: '', color: '', qty: 1, unitPrice: 0 }]);
+
+  const [items, setItems] = useState([
+    { variant: "", color: "", qty: 1, unitPrice: 0 },
+  ]);
   const [fees, setFees] = useState({ registration: 0, plate: 0, delivery: 0 });
   const [validUntil, setValidUntil] = useState(null);
-  const [notes, setNotes] = useState('');
-  
+  const [notes, setNotes] = useState("");
+
   const [subtotal, setSubtotal] = useState(0);
   const [promotionTotal, setPromotionTotal] = useState(0);
   const [total, setTotal] = useState(0);
@@ -61,51 +64,77 @@ const CreateQuoteScreen = ({ navigation }) => {
 
   const loadData = async () => {
     try {
-      const [customersData, vehiclesData, colorsData, promotionsData] = await Promise.all([
-        customerService.getCustomers(),
-        vehicleService.getVehicles(),
-        vehicleService.getVehicleColors(),
-        promotionService.getPromotions(),
-      ]);
-      setCustomers(Array.isArray(customersData) ? customersData : (customersData?.data || []));
-      setVehicles(Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.data || []));
-      setColors(Array.isArray(colorsData) ? colorsData : (colorsData?.data || []));
-      setPromotions(Array.isArray(promotionsData) ? promotionsData : (promotionsData?.data || []));
+      const [customersData, vehiclesData, colorsData, promotionsData] =
+        await Promise.all([
+          customerService.getCustomers(),
+          vehicleService.getVehicles(),
+          vehicleService.getVehicleColors(),
+          promotionService.getPromotions(),
+        ]);
+      setCustomers(
+        Array.isArray(customersData) ? customersData : customersData?.data || []
+      );
+      setVehicles(
+        Array.isArray(vehiclesData) ? vehiclesData : vehiclesData?.data || []
+      );
+      setColors(
+        Array.isArray(colorsData) ? colorsData : colorsData?.data || []
+      );
+      setPromotions(
+        Array.isArray(promotionsData)
+          ? promotionsData
+          : promotionsData?.data || []
+      );
     } catch (error) {
-      console.error('Load data error:', error);
-      alert('Tải dữ liệu thất bại: ' + (error.response?.data?.message || error.message));
+      console.error("Load data error:", error);
+      alert(
+        "Tải dữ liệu thất bại: " +
+          (error.response?.data?.message || error.message)
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const calculateTotal = () => {
-    const sub = items.reduce((sum, item) => sum + (item.unitPrice || 0) * (item.qty || 0), 0);
+    const sub = items.reduce(
+      (sum, item) => sum + (item.unitPrice || 0) * (item.qty || 0),
+      0
+    );
     setSubtotal(sub);
-    const promoTotal = selectedPromotion ? (selectedPromotion.discountAmount || selectedPromotion.discountPercent ? 
-      (selectedPromotion.discountAmount || (sub * (selectedPromotion.discountPercent || 0) / 100)) : 0) : 0;
+    const promoTotal = selectedPromotion
+      ? selectedPromotion.discountAmount || selectedPromotion.discountPercent
+        ? selectedPromotion.discountAmount ||
+          (sub * (selectedPromotion.discountPercent || 0)) / 100
+        : 0
+      : 0;
     setPromotionTotal(promoTotal);
-    const totalAmount = sub - promoTotal + (fees.registration || 0) + (fees.plate || 0) + (fees.delivery || 0);
+    const totalAmount =
+      sub -
+      promoTotal +
+      (fees.registration || 0) +
+      (fees.plate || 0) +
+      (fees.delivery || 0);
     setTotal(totalAmount);
   };
 
   const updateItem = (index, field, value) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
-    
-    if (field === 'variant') {
+
+    if (field === "variant") {
       const vehicle = vehicles.find((v) => v._id === value);
       if (vehicle) {
         newItems[index].unitPrice = vehicle.msrp || 0;
-        newItems[index].color = ''; // Reset color when variant changes
+        newItems[index].color = ""; // Reset color when variant changes
       }
     }
-    
+
     setItems(newItems);
   };
 
   const addItem = () => {
-    setItems([...items, { variant: '', color: '', qty: 1, unitPrice: 0 }]);
+    setItems([...items, { variant: "", color: "", qty: 1, unitPrice: 0 }]);
   };
 
   const removeItem = (index) => {
@@ -116,12 +145,16 @@ const CreateQuoteScreen = ({ navigation }) => {
 
   const handleSubmit = async () => {
     if (!selectedCustomer) {
-      alert('Vui lòng chọn khách hàng');
+      alert("Vui lòng chọn khách hàng");
       return;
     }
 
-    if (items.some((item) => !item.variant || item.qty <= 0 || item.unitPrice <= 0)) {
-      alert('Vui lòng điền đầy đủ thông tin sản phẩm');
+    if (
+      items.some(
+        (item) => !item.variant || item.qty <= 0 || item.unitPrice <= 0
+      )
+    ) {
+      alert("Vui lòng điền đầy đủ thông tin sản phẩm");
       return;
     }
 
@@ -145,11 +178,33 @@ const CreateQuoteScreen = ({ navigation }) => {
       };
 
       const result = await quoteService.createQuote(quoteData);
-      alert('Tạo báo giá thành công');
+      showMessage({
+        message: "🎉 Thành công!",
+        description: "Báo giá đã được tạo thành công.",
+        type: "success",
+        backgroundColor: "#4CAF50",
+        color: "#fff",
+        icon: "success",
+        duration: 2500,
+        floating: true,
+      });
       navigation.goBack();
     } catch (error) {
-      console.error('Create quote error:', error);
-      alert('Tạo báo giá thất bại: ' + (error.response?.data?.message || error.message || 'Lỗi không xác định'));
+      console.error("Create quote error:", error);
+      showMessage({
+        message: "❌ Thất bại!",
+        description:
+          "Không thể tạo báo giá. " +
+          (error.response?.data?.message ||
+            error.message ||
+            "Lỗi không xác định."),
+        type: "danger",
+        backgroundColor: "#E53935",
+        color: "#fff",
+        icon: "danger",
+        duration: 3000,
+        floating: true,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -167,7 +222,10 @@ const CreateQuoteScreen = ({ navigation }) => {
 
   const renderDatePickerModal = () => {
     const daysInMonth = getDaysInMonth(selectedYear, selectedMonth);
-    const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i);
+    const years = Array.from(
+      { length: 10 },
+      (_, i) => new Date().getFullYear() + i
+    );
     const months = Array.from({ length: 12 }, (_, i) => i + 1);
     const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
@@ -183,7 +241,11 @@ const CreateQuoteScreen = ({ navigation }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chọn ngày hết hạn</Text>
               <TouchableOpacity onPress={() => setDatePickerVisible(false)}>
-                <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={theme.colors.textPrimary}
+                />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.datePickerContent}>
@@ -194,10 +256,20 @@ const CreateQuoteScreen = ({ navigation }) => {
                     {years.map((year) => (
                       <TouchableOpacity
                         key={year}
-                        style={[styles.datePickerItem, selectedYear === year && styles.datePickerItemSelected]}
+                        style={[
+                          styles.datePickerItem,
+                          selectedYear === year &&
+                            styles.datePickerItemSelected,
+                        ]}
                         onPress={() => setSelectedYear(year)}
                       >
-                        <Text style={[styles.datePickerItemText, selectedYear === year && styles.datePickerItemTextSelected]}>
+                        <Text
+                          style={[
+                            styles.datePickerItemText,
+                            selectedYear === year &&
+                              styles.datePickerItemTextSelected,
+                          ]}
+                        >
                           {year}
                         </Text>
                       </TouchableOpacity>
@@ -210,14 +282,24 @@ const CreateQuoteScreen = ({ navigation }) => {
                     {months.map((month) => (
                       <TouchableOpacity
                         key={month}
-                        style={[styles.datePickerItem, selectedMonth === month && styles.datePickerItemSelected]}
+                        style={[
+                          styles.datePickerItem,
+                          selectedMonth === month &&
+                            styles.datePickerItemSelected,
+                        ]}
                         onPress={() => {
                           setSelectedMonth(month);
                           const maxDay = getDaysInMonth(selectedYear, month);
                           if (selectedDay > maxDay) setSelectedDay(maxDay);
                         }}
                       >
-                        <Text style={[styles.datePickerItemText, selectedMonth === month && styles.datePickerItemTextSelected]}>
+                        <Text
+                          style={[
+                            styles.datePickerItemText,
+                            selectedMonth === month &&
+                              styles.datePickerItemTextSelected,
+                          ]}
+                        >
                           {month}
                         </Text>
                       </TouchableOpacity>
@@ -230,10 +312,19 @@ const CreateQuoteScreen = ({ navigation }) => {
                     {days.map((day) => (
                       <TouchableOpacity
                         key={day}
-                        style={[styles.datePickerItem, selectedDay === day && styles.datePickerItemSelected]}
+                        style={[
+                          styles.datePickerItem,
+                          selectedDay === day && styles.datePickerItemSelected,
+                        ]}
                         onPress={() => setSelectedDay(day)}
                       >
-                        <Text style={[styles.datePickerItemText, selectedDay === day && styles.datePickerItemTextSelected]}>
+                        <Text
+                          style={[
+                            styles.datePickerItemText,
+                            selectedDay === day &&
+                              styles.datePickerItemTextSelected,
+                          ]}
+                        >
                           {day}
                         </Text>
                       </TouchableOpacity>
@@ -267,15 +358,19 @@ const CreateQuoteScreen = ({ navigation }) => {
       <View style={styles.modalItemContent}>
         <Text style={styles.modalItemTitle}>{item.name || item.title}</Text>
         <Text style={styles.modalItemSubtitle}>
-          {item.discountAmount 
-            ? `Giảm ${item.discountAmount.toLocaleString('vi-VN')} đ`
-            : item.discountPercent 
+          {item.discountAmount
+            ? `Giảm ${item.discountAmount.toLocaleString("vi-VN")} đ`
+            : item.discountPercent
             ? `Giảm ${item.discountPercent}%`
-            : 'Khuyến mãi'}
+            : "Khuyến mãi"}
         </Text>
       </View>
       {selectedPromotion?._id === item._id && (
-        <Ionicons name="checkmark-circle" size={24} color={theme.colors.primary} />
+        <Ionicons
+          name="checkmark-circle"
+          size={24}
+          color={theme.colors.primary}
+        />
       )}
     </TouchableOpacity>
   );
@@ -290,28 +385,39 @@ const CreateQuoteScreen = ({ navigation }) => {
     >
       <View style={styles.modalItemContent}>
         <Text style={styles.modalItemTitle}>{item.fullName}</Text>
-        <Text style={styles.modalItemSubtitle}>{item.phone} • {item.email}</Text>
+        <Text style={styles.modalItemSubtitle}>
+          {item.phone} • {item.email}
+        </Text>
       </View>
       {selectedCustomer?._id === item._id && (
-        <Ionicons name="checkmark-circle" size={24} color={theme.colors.primary} />
+        <Ionicons
+          name="checkmark-circle"
+          size={24}
+          color={theme.colors.primary}
+        />
       )}
     </TouchableOpacity>
   );
 
   const renderVariantItem = ({ item }, itemIndex) => {
-    const modelName = typeof item.model === 'object' ? item.model?.name : 'N/A';
+    const modelName = typeof item.model === "object" ? item.model?.name : "N/A";
     return (
       <TouchableOpacity
         style={styles.modalItem}
         onPress={() => {
-          updateItem(itemIndex, 'variant', item._id);
-          setVariantModalVisible({ ...variantModalVisible, [itemIndex]: false });
+          updateItem(itemIndex, "variant", item._id);
+          setVariantModalVisible({
+            ...variantModalVisible,
+            [itemIndex]: false,
+          });
         }}
       >
         <View style={styles.modalItemContent}>
-          <Text style={styles.modalItemTitle}>{modelName} - {item.trim}</Text>
+          <Text style={styles.modalItemTitle}>
+            {modelName} - {item.trim}
+          </Text>
           <Text style={styles.modalItemSubtitle}>
-            {item.msrp?.toLocaleString('vi-VN')} đ
+            {item.msrp?.toLocaleString("vi-VN")} đ
             {item.range && ` • ${item.range} km`}
             {item.motorPower && ` • ${item.motorPower} kW`}
           </Text>
@@ -324,15 +430,19 @@ const CreateQuoteScreen = ({ navigation }) => {
     <TouchableOpacity
       style={styles.modalItem}
       onPress={() => {
-        updateItem(itemIndex, 'color', item._id);
+        updateItem(itemIndex, "color", item._id);
         setColorModalVisible({ ...colorModalVisible, [itemIndex]: false });
       }}
     >
-      <View style={[styles.colorSwatch, { backgroundColor: item.hex || '#ccc' }]} />
+      <View
+        style={[styles.colorSwatch, { backgroundColor: item.hex || "#ccc" }]}
+      />
       <View style={styles.modalItemContent}>
         <Text style={styles.modalItemTitle}>{item.name}</Text>
         {item.extraPrice > 0 && (
-          <Text style={styles.modalItemSubtitle}>+{item.extraPrice.toLocaleString('vi-VN')} đ</Text>
+          <Text style={styles.modalItemSubtitle}>
+            +{item.extraPrice.toLocaleString("vi-VN")} đ
+          </Text>
         )}
       </View>
     </TouchableOpacity>
@@ -343,8 +453,11 @@ const CreateQuoteScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Customer Selection */}
         <Card>
           <Text style={styles.sectionTitle}>Khách hàng</Text>
@@ -355,14 +468,22 @@ const CreateQuoteScreen = ({ navigation }) => {
             <View style={styles.pickerContent}>
               {selectedCustomer ? (
                 <View>
-                  <Text style={styles.pickerText}>{selectedCustomer.fullName}</Text>
-                  <Text style={styles.pickerSubtext}>{selectedCustomer.phone}</Text>
+                  <Text style={styles.pickerText}>
+                    {selectedCustomer.fullName}
+                  </Text>
+                  <Text style={styles.pickerSubtext}>
+                    {selectedCustomer.phone}
+                  </Text>
                 </View>
               ) : (
                 <Text style={styles.pickerPlaceholder}>Chọn khách hàng</Text>
               )}
             </View>
-            <Ionicons name="chevron-down" size={20} color={theme.colors.textSecondary} />
+            <Ionicons
+              name="chevron-down"
+              size={20}
+              color={theme.colors.textSecondary}
+            />
           </TouchableOpacity>
         </Card>
 
@@ -371,18 +492,24 @@ const CreateQuoteScreen = ({ navigation }) => {
           <View style={styles.itemsHeader}>
             <Text style={styles.sectionTitle}>Sản phẩm</Text>
             <TouchableOpacity onPress={addItem} style={styles.addButton}>
-              <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
+              <Ionicons
+                name="add-circle"
+                size={24}
+                color={theme.colors.primary}
+              />
             </TouchableOpacity>
           </View>
 
           {items.map((item, index) => {
-            const selectedVehicle = vehicles.find((v) => v._id === item.variant);
+            const selectedVehicle = vehicles.find(
+              (v) => v._id === item.variant
+            );
             const selectedColor = colors.find((c) => c._id === item.color);
             const modelName = selectedVehicle
-              ? typeof selectedVehicle.model === 'object'
+              ? typeof selectedVehicle.model === "object"
                 ? selectedVehicle.model?.name
-                : 'N/A'
-              : 'Chọn mẫu xe';
+                : "N/A"
+              : "Chọn mẫu xe";
 
             return (
               <View key={index} style={styles.itemCard}>
@@ -390,7 +517,11 @@ const CreateQuoteScreen = ({ navigation }) => {
                   <Text style={styles.itemTitle}>Sản phẩm {index + 1}</Text>
                   {items.length > 1 && (
                     <TouchableOpacity onPress={() => removeItem(index)}>
-                      <Ionicons name="close-circle" size={24} color={theme.colors.error} />
+                      <Ionicons
+                        name="close-circle"
+                        size={24}
+                        color={theme.colors.error}
+                      />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -400,14 +531,26 @@ const CreateQuoteScreen = ({ navigation }) => {
                   <Text style={styles.pickerLabel}>Mẫu xe *</Text>
                   <TouchableOpacity
                     style={styles.picker}
-                    onPress={() => setVariantModalVisible({ ...variantModalVisible, [index]: true })}
+                    onPress={() =>
+                      setVariantModalVisible({
+                        ...variantModalVisible,
+                        [index]: true,
+                      })
+                    }
                   >
                     <View style={styles.pickerContent}>
                       <Text style={styles.pickerText}>
-                        {modelName} {selectedVehicle?.trim ? `- ${selectedVehicle.trim}` : ''}
+                        {modelName}{" "}
+                        {selectedVehicle?.trim
+                          ? `- ${selectedVehicle.trim}`
+                          : ""}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-down" size={20} color={theme.colors.textSecondary} />
+                    <Ionicons
+                      name="chevron-down"
+                      size={20}
+                      color={theme.colors.textSecondary}
+                    />
                   </TouchableOpacity>
                 </View>
 
@@ -416,25 +559,46 @@ const CreateQuoteScreen = ({ navigation }) => {
                   <Text style={styles.pickerLabel}>Màu sắc</Text>
                   <TouchableOpacity
                     style={styles.picker}
-                    onPress={() => setColorModalVisible({ ...colorModalVisible, [index]: true })}
+                    onPress={() =>
+                      setColorModalVisible({
+                        ...colorModalVisible,
+                        [index]: true,
+                      })
+                    }
                     disabled={!item.variant}
                   >
                     <View style={styles.pickerContent}>
                       {selectedColor ? (
                         <View style={styles.colorPickerContent}>
-                          <View style={[styles.colorSwatchSmall, { backgroundColor: selectedColor.hex || '#ccc' }]} />
-                          <Text style={styles.pickerText}>{selectedColor.name}</Text>
+                          <View
+                            style={[
+                              styles.colorSwatchSmall,
+                              { backgroundColor: selectedColor.hex || "#ccc" },
+                            ]}
+                          />
+                          <Text style={styles.pickerText}>
+                            {selectedColor.name}
+                          </Text>
                         </View>
                       ) : (
-                        <Text style={[styles.pickerPlaceholder, !item.variant && styles.pickerDisabled]}>
-                          {item.variant ? 'Chọn màu sắc' : 'Chọn mẫu xe trước'}
+                        <Text
+                          style={[
+                            styles.pickerPlaceholder,
+                            !item.variant && styles.pickerDisabled,
+                          ]}
+                        >
+                          {item.variant ? "Chọn màu sắc" : "Chọn mẫu xe trước"}
                         </Text>
                       )}
                     </View>
-                    <Ionicons 
-                      name="chevron-down" 
-                      size={20} 
-                      color={!item.variant ? theme.colors.textTertiary : theme.colors.textSecondary} 
+                    <Ionicons
+                      name="chevron-down"
+                      size={20}
+                      color={
+                        !item.variant
+                          ? theme.colors.textTertiary
+                          : theme.colors.textSecondary
+                      }
                     />
                   </TouchableOpacity>
                 </View>
@@ -443,16 +607,22 @@ const CreateQuoteScreen = ({ navigation }) => {
                 <Input
                   label="Số lượng *"
                   value={item.qty?.toString()}
-                  onChangeText={(text) => updateItem(index, 'qty', parseInt(text) || 0)}
+                  onChangeText={(text) =>
+                    updateItem(index, "qty", parseInt(text) || 0)
+                  }
                   keyboardType="numeric"
                 />
 
                 {/* Unit Price */}
                 <Input
                   label="Đơn giá *"
-                  value={item.unitPrice?.toLocaleString('vi-VN')}
+                  value={item.unitPrice?.toLocaleString("vi-VN")}
                   onChangeText={(text) =>
-                    updateItem(index, 'unitPrice', parseInt(text.replace(/\./g, '')) || 0)
+                    updateItem(
+                      index,
+                      "unitPrice",
+                      parseInt(text.replace(/\./g, "")) || 0
+                    )
                   }
                   keyboardType="numeric"
                 />
@@ -464,10 +634,12 @@ const CreateQuoteScreen = ({ navigation }) => {
         {/* Pricing Section */}
         <Card>
           <Text style={styles.sectionTitle}>Giá và phí</Text>
-          
+
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Tạm tính:</Text>
-            <Text style={styles.priceValue}>{subtotal.toLocaleString('vi-VN')} đ</Text>
+            <Text style={styles.priceValue}>
+              {subtotal.toLocaleString("vi-VN")} đ
+            </Text>
           </View>
 
           {/* Promotion Picker */}
@@ -480,17 +652,23 @@ const CreateQuoteScreen = ({ navigation }) => {
               <View style={styles.pickerContent}>
                 {selectedPromotion ? (
                   <View>
-                    <Text style={styles.pickerText}>{selectedPromotion.name || selectedPromotion.title}</Text>
+                    <Text style={styles.pickerText}>
+                      {selectedPromotion.name || selectedPromotion.title}
+                    </Text>
                     <Text style={styles.pickerSubtext}>
-                      {selectedPromotion.discountAmount 
-                        ? `Giảm ${selectedPromotion.discountAmount.toLocaleString('vi-VN')} đ`
-                        : selectedPromotion.discountPercent 
+                      {selectedPromotion.discountAmount
+                        ? `Giảm ${selectedPromotion.discountAmount.toLocaleString(
+                            "vi-VN"
+                          )} đ`
+                        : selectedPromotion.discountPercent
                         ? `Giảm ${selectedPromotion.discountPercent}%`
-                        : 'Khuyến mãi'}
+                        : "Khuyến mãi"}
                     </Text>
                   </View>
                 ) : (
-                  <Text style={styles.pickerPlaceholder}>Chọn khuyến mãi (nếu có)</Text>
+                  <Text style={styles.pickerPlaceholder}>
+                    Chọn khuyến mãi (nếu có)
+                  </Text>
                 )}
               </View>
               {selectedPromotion && (
@@ -501,55 +679,73 @@ const CreateQuoteScreen = ({ navigation }) => {
                   }}
                   style={styles.clearButton}
                 >
-                  <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                  <Ionicons
+                    name="close-circle"
+                    size={20}
+                    color={theme.colors.textSecondary}
+                  />
                 </TouchableOpacity>
               )}
-              <Ionicons name="chevron-down" size={20} color={theme.colors.textSecondary} />
+              <Ionicons
+                name="chevron-down"
+                size={20}
+                color={theme.colors.textSecondary}
+              />
             </TouchableOpacity>
           </View>
 
           {promotionTotal > 0 && (
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Khuyến mãi:</Text>
-              <Text style={[styles.priceValue, { color: theme.colors.success }]}>
-                -{promotionTotal.toLocaleString('vi-VN')} đ
+              <Text
+                style={[styles.priceValue, { color: theme.colors.success }]}
+              >
+                -{promotionTotal.toLocaleString("vi-VN")} đ
               </Text>
             </View>
           )}
 
           <Text style={styles.feesLabel}>Phí</Text>
-          
+
           <Input
             label="Phí đăng ký"
             value={fees.registration?.toString()}
-            onChangeText={(text) => setFees({ ...fees, registration: parseInt(text) || 0 })}
+            onChangeText={(text) =>
+              setFees({ ...fees, registration: parseInt(text) || 0 })
+            }
             keyboardType="numeric"
           />
 
           <Input
             label="Phí biển số"
             value={fees.plate?.toString()}
-            onChangeText={(text) => setFees({ ...fees, plate: parseInt(text) || 0 })}
+            onChangeText={(text) =>
+              setFees({ ...fees, plate: parseInt(text) || 0 })
+            }
             keyboardType="numeric"
           />
 
           <Input
             label="Phí giao hàng"
             value={fees.delivery?.toString()}
-            onChangeText={(text) => setFees({ ...fees, delivery: parseInt(text) || 0 })}
+            onChangeText={(text) =>
+              setFees({ ...fees, delivery: parseInt(text) || 0 })
+            }
             keyboardType="numeric"
           />
 
           <View style={[styles.priceRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Tổng tiền:</Text>
-            <Text style={styles.totalValue}>{total.toLocaleString('vi-VN')} đ</Text>
+            <Text style={styles.totalValue}>
+              {total.toLocaleString("vi-VN")} đ
+            </Text>
           </View>
         </Card>
 
         {/* Additional Info */}
         <Card>
           <Text style={styles.sectionTitle}>Thông tin bổ sung</Text>
-          
+
           <View style={styles.pickerContainer}>
             <Text style={styles.pickerLabel}>Ngày hết hạn</Text>
             <TouchableOpacity
@@ -558,12 +754,20 @@ const CreateQuoteScreen = ({ navigation }) => {
             >
               <View style={styles.pickerContent}>
                 {validUntil ? (
-                  <Text style={styles.pickerText}>{format(validUntil, 'dd/MM/yyyy')}</Text>
+                  <Text style={styles.pickerText}>
+                    {format(validUntil, "dd/MM/yyyy")}
+                  </Text>
                 ) : (
-                  <Text style={styles.pickerPlaceholder}>Chọn ngày hết hạn</Text>
+                  <Text style={styles.pickerPlaceholder}>
+                    Chọn ngày hết hạn
+                  </Text>
                 )}
               </View>
-              <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+              <Ionicons
+                name="calendar-outline"
+                size={20}
+                color={theme.colors.textSecondary}
+              />
             </TouchableOpacity>
           </View>
 
@@ -582,12 +786,15 @@ const CreateQuoteScreen = ({ navigation }) => {
         </Card>
 
         <Button
-          title="Tạo báo giá"
+          title={submitting ? "Đang xử lý..." : "Tạo báo giá"}
           variant="primary"
           onPress={handleSubmit}
-          loading={submitting}
+          disabled={submitting}
           fullWidth
-          style={styles.submitButton}
+          style={[
+            styles.submitButton,
+            submitting && { backgroundColor: "#CBD5E1" },
+          ]}
         />
       </ScrollView>
 
@@ -603,7 +810,11 @@ const CreateQuoteScreen = ({ navigation }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chọn khách hàng</Text>
               <TouchableOpacity onPress={() => setCustomerModalVisible(false)}>
-                <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={theme.colors.textPrimary}
+                />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -627,14 +838,27 @@ const CreateQuoteScreen = ({ navigation }) => {
           visible={variantModalVisible[index] || false}
           transparent
           animationType="slide"
-          onRequestClose={() => setVariantModalVisible({ ...variantModalVisible, [index]: false })}
+          onRequestClose={() =>
+            setVariantModalVisible({ ...variantModalVisible, [index]: false })
+          }
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Chọn mẫu xe</Text>
-                <TouchableOpacity onPress={() => setVariantModalVisible({ ...variantModalVisible, [index]: false })}>
-                  <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+                <TouchableOpacity
+                  onPress={() =>
+                    setVariantModalVisible({
+                      ...variantModalVisible,
+                      [index]: false,
+                    })
+                  }
+                >
+                  <Ionicons
+                    name="close"
+                    size={24}
+                    color={theme.colors.textPrimary}
+                  />
                 </TouchableOpacity>
               </View>
               <FlatList
@@ -659,14 +883,27 @@ const CreateQuoteScreen = ({ navigation }) => {
           visible={colorModalVisible[index] || false}
           transparent
           animationType="slide"
-          onRequestClose={() => setColorModalVisible({ ...colorModalVisible, [index]: false })}
+          onRequestClose={() =>
+            setColorModalVisible({ ...colorModalVisible, [index]: false })
+          }
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Chọn màu sắc</Text>
-                <TouchableOpacity onPress={() => setColorModalVisible({ ...colorModalVisible, [index]: false })}>
-                  <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+                <TouchableOpacity
+                  onPress={() =>
+                    setColorModalVisible({
+                      ...colorModalVisible,
+                      [index]: false,
+                    })
+                  }
+                >
+                  <Ionicons
+                    name="close"
+                    size={24}
+                    color={theme.colors.textPrimary}
+                  />
                 </TouchableOpacity>
               </View>
               <FlatList
@@ -696,7 +933,11 @@ const CreateQuoteScreen = ({ navigation }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chọn khuyến mãi</Text>
               <TouchableOpacity onPress={() => setPromotionModalVisible(false)}>
-                <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={theme.colors.textPrimary}
+                />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -729,7 +970,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: theme.spacing.lg,
-    paddingBottom: theme.spacing['3xl'],
+    paddingBottom: theme.spacing["3xl"],
   },
   sectionTitle: {
     fontSize: theme.typography.fontSize.lg,
@@ -738,9 +979,9 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   picker: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     backgroundColor: theme.colors.backgroundLight,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -777,9 +1018,9 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xs,
   },
   itemsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: theme.spacing.md,
   },
   addButton: {
@@ -794,9 +1035,9 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
   },
   itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: theme.spacing.md,
   },
   itemTitle: {
@@ -805,9 +1046,9 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
   },
   priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: theme.spacing.md,
   },
   priceLabel: {
@@ -838,7 +1079,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
   },
   totalValue: {
-    fontSize: theme.typography.fontSize['2xl'],
+    fontSize: theme.typography.fontSize["2xl"],
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.primary,
   },
@@ -867,20 +1108,20 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
   },
   modalContent: {
     backgroundColor: theme.colors.backgroundLight,
     borderTopLeftRadius: theme.borderRadius.xl,
     borderTopRightRadius: theme.borderRadius.xl,
-    maxHeight: '80%',
+    maxHeight: "80%",
     paddingBottom: theme.spacing.lg,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: theme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
@@ -891,8 +1132,8 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
   },
   modalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     borderBottomWidth: 1,
@@ -928,12 +1169,12 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
   },
   colorPickerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   emptyState: {
     padding: theme.spacing.xl,
-    alignItems: 'center',
+    alignItems: "center",
   },
   emptyText: {
     fontSize: theme.typography.fontSize.base,
@@ -948,19 +1189,19 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.backgroundLight,
     borderTopLeftRadius: theme.borderRadius.xl,
     borderTopRightRadius: theme.borderRadius.xl,
-    maxHeight: '70%',
+    maxHeight: "70%",
     paddingBottom: theme.spacing.lg,
   },
   datePickerContent: {
     padding: theme.spacing.md,
   },
   datePickerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
   },
   datePickerColumn: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     marginHorizontal: theme.spacing.xs,
   },
   datePickerLabel: {
@@ -971,14 +1212,14 @@ const styles = StyleSheet.create({
   },
   datePickerList: {
     maxHeight: 200,
-    width: '100%',
+    width: "100%",
   },
   datePickerItem: {
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     marginVertical: 2,
     backgroundColor: theme.colors.background,
-    alignItems: 'center',
+    alignItems: "center",
   },
   datePickerItemSelected: {
     backgroundColor: theme.colors.primary,
@@ -995,6 +1236,73 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+  },
+
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#1E293B",
+    marginBottom: 10,
+  },
+  picker: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginTop: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  pickerPlaceholder: {
+    color: "#94A3B8",
+  },
+  addButton: {
+    backgroundColor: "#E0F2FE",
+    padding: 8,
+    borderRadius: 10,
+  },
+  totalRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    marginTop: 10,
+    paddingTop: 8,
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#1E3A8A",
+  },
+  totalValue: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1E3A8A",
+  },
+  submitButton: {
+    marginTop: 20,
+    borderRadius: 14,
+    backgroundColor: "#007AFF",
+    paddingVertical: 14,
+    alignItems: "center",
+    shadowColor: "#007AFF",
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 3,
   },
 });
 

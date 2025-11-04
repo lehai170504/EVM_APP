@@ -1,13 +1,9 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { theme } from '../theme';
+import React from "react";
+import { View, StyleSheet } from "react-native";
+import { theme } from "../theme";
 
 export const Card = ({ children, style }) => {
-  return (
-    <View style={[styles.card, style]}>
-      {children}
-    </View>
-  );
+  return <View style={[styles.card, style]}>{children}</View>;
 };
 
 const styles = StyleSheet.create({
@@ -19,4 +15,3 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
 });
-

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,17 +8,17 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Loading } from '../components/Loading';
-import { theme } from '../theme';
-import { dashboardService } from '../services/dashboardService';
-import { orderService } from '../services/orderService';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../context/AuthContext';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Loading } from "../components/Loading";
+import { theme } from "../theme";
+import { dashboardService } from "../services/dashboardService";
+import { orderService } from "../services/orderService";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { useAuth } from "../context/AuthContext";
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = 260;
 const CARD_GAP = 16;
 const CARD_WRAPPER_WIDTH = CARD_WIDTH + CARD_GAP;
@@ -52,15 +52,17 @@ const DashboardScreen = () => {
         dashboardService.getPersonalStats(),
         orderService.getOrders(),
       ]);
-      
+
       setStats(statsData);
       // Lấy 5 orders gần nhất (đã sorted by createdAt DESC từ backend)
-      const sortedOrders = Array.isArray(ordersData) 
-        ? ordersData.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      const sortedOrders = Array.isArray(ordersData)
+        ? ordersData.sort(
+            (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+          )
         : [];
       setRecentOrders(sortedOrders.slice(0, 5));
     } catch (error) {
-      console.error('Load dashboard error:', error);
+      console.error("Load dashboard error:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -88,31 +90,34 @@ const DashboardScreen = () => {
   const deliveredOrders = ordersByStatus.delivered || 0;
 
   const getInitials = (name) => {
-    if (!name) return 'U';
+    if (!name) return "U";
     return name
-      .split(' ')
+      .split(" ")
       .map((n) => n[0])
-      .join('')
+      .join("")
       .toUpperCase()
       .substring(0, 2);
   };
 
-  const userName = user?.profile?.name || user?.email || 'User';
-  
+  const userName = user?.profile?.name || user?.email || "User";
+
   const greeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 18) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return "Good Morning";
+    if (hour < 18) return "Good Afternoon";
+    return "Good Evening";
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={Boolean(refreshing)}
+            onRefresh={onRefresh}
+          />
         }
         showsVerticalScrollIndicator={false}
       >
@@ -120,9 +125,9 @@ const DashboardScreen = () => {
         <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
           <View style={styles.headerTop}>
             <Text style={styles.headerTitle}>Tổng quan</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.avatarContainer}
-              onPress={() => navigation.navigate('Settings')}
+              onPress={() => navigation.navigate("Settings")}
               activeOpacity={0.7}
             >
               <View style={styles.avatar}>
@@ -133,10 +138,11 @@ const DashboardScreen = () => {
           </View>
           <View style={styles.headerUserInfo}>
             <Text style={styles.greetingText}>{greeting()}</Text>
-            <Text style={styles.userNameText} numberOfLines={1}>{userName}</Text>
+            <Text style={styles.userNameText} numberOfLines={1}>
+              {userName}
+            </Text>
           </View>
         </Animated.View>
-
         {/* Compact Revenue Card */}
         <Animated.View style={[styles.revenueCard, { opacity: fadeAnim }]}>
           <View style={styles.revenueCardGradient}>
@@ -144,11 +150,15 @@ const DashboardScreen = () => {
               <View style={styles.revenueLeft}>
                 <Text style={styles.revenueLabel}>Monthly Revenue</Text>
                 <Text style={styles.revenueAmount} numberOfLines={1}>
-                  {totalRevenue.toLocaleString('vi-VN')} đ
+                  {totalRevenue.toLocaleString("vi-VN")} đ
                 </Text>
               </View>
               <View style={styles.revenueIcon}>
-                <Ionicons name="trending-up" size={20} color={theme.colors.textWhite} />
+                <Ionicons
+                  name="trending-up"
+                  size={20}
+                  color={theme.colors.textWhite}
+                />
               </View>
             </View>
             <View style={styles.revenueStats}>
@@ -160,18 +170,17 @@ const DashboardScreen = () => {
               <View style={styles.revenueStatItem}>
                 <Text style={styles.revenueStatLabel}>Avg</Text>
                 <Text style={styles.revenueStatValue} numberOfLines={1}>
-                  {averageOrderValue.toLocaleString('vi-VN')} đ
+                  {averageOrderValue.toLocaleString("vi-VN")} đ
                 </Text>
               </View>
             </View>
           </View>
         </Animated.View>
-
         {/* Stats Carousel - Infinite Loop, Center Snapping */}
         <View style={styles.statsCarouselContainer}>
-          <ScrollView 
+          <ScrollView
             ref={carouselRef}
-            horizontal 
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.statsCarousel}
             snapToInterval={CARD_WRAPPER_WIDTH}
@@ -182,7 +191,7 @@ const DashboardScreen = () => {
               const offsetX = e.nativeEvent.contentOffset.x;
               const index = Math.round(offsetX / CARD_WRAPPER_WIDTH);
               currentIndex.current = index;
-              
+
               // Infinite loop: if at start, jump to middle
               if (index === 0) {
                 setTimeout(() => {
@@ -217,7 +226,7 @@ const DashboardScreen = () => {
             {[...Array(ITEM_COUNT * 3)].map((_, index) => {
               const realIndex = index % ITEM_COUNT;
               let icon, label, value, color, delay;
-              
+
               if (realIndex === 0) {
                 icon = "clipboard";
                 label = "Total Orders";
@@ -237,7 +246,7 @@ const DashboardScreen = () => {
                 color = theme.colors.success;
                 delay = 300;
               }
-              
+
               return (
                 <View key={index} style={styles.statCardWrapper}>
                   <StatCard
@@ -252,31 +261,35 @@ const DashboardScreen = () => {
             })}
           </ScrollView>
         </View>
-
         {/* Recent Orders */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View>
               <Text style={styles.sectionTitle}>Recent Orders</Text>
               <Text style={styles.sectionSubtitle}>
-                {recentOrders.length} {recentOrders.length === 1 ? 'order' : 'orders'}
+                {recentOrders.length}{" "}
+                {recentOrders.length === 1 ? "order" : "orders"}
               </Text>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.seeAllButton}
-              onPress={() => navigation.navigate('Orders')}
+              onPress={() => navigation.navigate("Orders")}
             >
               <Text style={styles.seeAllText}>See All</Text>
-              <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={theme.colors.primary}
+              />
             </TouchableOpacity>
           </View>
 
           {recentOrders.length > 0 ? (
             <View style={styles.ordersContainer}>
               {recentOrders.map((order, index) => (
-                <OrderCard 
-                  key={order._id || index} 
-                  order={order} 
+                <OrderCard
+                  key={order._id || index}
+                  order={order}
                   navigation={navigation}
                   index={index}
                 />
@@ -285,50 +298,66 @@ const DashboardScreen = () => {
           ) : (
             <View style={styles.emptyState}>
               <View style={styles.emptyIcon}>
-                <Ionicons name="document-outline" size={48} color={theme.colors.textTertiary} />
+                <Ionicons
+                  name="document-outline"
+                  size={48}
+                  color={theme.colors.textTertiary}
+                />
               </View>
               <Text style={styles.emptyTitle}>No Orders Yet</Text>
-              <Text style={styles.emptySubtitle}>Start by creating your first order</Text>
-              <TouchableOpacity 
+              <Text style={styles.emptySubtitle}>
+                Start by creating your first order
+              </Text>
+              <TouchableOpacity
                 style={styles.emptyButton}
-                onPress={() => navigation.navigate('CreateOrder')}
+                onPress={() => navigation.navigate("CreateOrder")}
               >
                 <Text style={styles.emptyButtonText}>Create Order</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
-
         {/* Quick Actions */}
-        {/* <View style={styles.section}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActionsGrid}>
+            {/* QUICK ACTION: Lịch lái thử (Mới) */}
+            <QuickActionButton
+              icon="calendar-outline"
+              label="Lịch lái thử"
+              color={theme.colors.tertiary || "#8e44ad"} // Màu Tím
+              onPress={() => navigation.navigate("TestDrives")}
+            />
+            {/* QUICK ACTION: Danh sách xe điện */}
             <QuickActionButton
               icon="add-circle"
-              label="Add Vehicle"
+              label="Danh sách xe điện"
               color={theme.colors.primary}
-              onPress={() => navigation.navigate('Products')}
+              onPress={() => navigation.navigate("Products")}
             />
+            {/* QUICK ACTION: New Order */}
             <QuickActionButton
               icon="cart"
               label="New Order"
               color={theme.colors.accent}
-              onPress={() => navigation.navigate('CreateOrder')}
+              onPress={() => navigation.navigate("CreateOrder")}
             />
+            {/* QUICK ACTION: Quotes */}
             <QuickActionButton
               icon="document-text"
               label="Quotes"
               color={theme.colors.secondary}
-              onPress={() => navigation.navigate('Quotes')}
+              onPress={() => navigation.navigate("Quotes")}
             />
+            {/* QUICK ACTION: Customers */}
             <QuickActionButton
               icon="people"
               label="Customers"
               color={theme.colors.warning}
-              onPress={() => navigation.navigate('Customers')}
+              onPress={() => navigation.navigate("Customers")}
             />
           </View>
-        </View> */}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -349,17 +378,16 @@ const StatCard = ({ icon, label, value, color, delay }) => {
   }, []);
 
   return (
-    <Animated.View 
-      style={[
-        styles.statCard,
-        { transform: [{ scale: scaleAnim }] }
-      ]}
+    <Animated.View
+      style={[styles.statCard, { transform: [{ scale: scaleAnim }] }]}
     >
-      <View style={[styles.statIconContainer, { backgroundColor: color + '15' }]}>
+      <View
+        style={[styles.statIconContainer, { backgroundColor: color + "15" }]}
+      >
         <Ionicons name={icon} size={24} color={color} />
       </View>
       <Text style={styles.statValue}>
-        {typeof value === 'number' ? value.toLocaleString('vi-VN') : value}
+        {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
       </Text>
       <Text style={styles.statLabel}>{label}</Text>
     </Animated.View>
@@ -401,20 +429,23 @@ const OrderCard = ({ order, navigation, index }) => {
   };
 
   // Lấy customer name từ API
-  const customerName = order.customer?.fullName || order.customer?.email || 'N/A';
-  
+  const customerName =
+    order.customer?.fullName || order.customer?.email || "N/A";
+
   // Lấy vehicle info từ items
   const firstItem = order.items?.[0];
-  const vehicleModel = firstItem?.variant?.trim || 
-                       firstItem?.variant?.model?.name || 
-                       'N/A';
-  
-  // Tính total từ items
-  const total = order.items?.reduce((sum, item) => {
-    return sum + ((item.unitPrice || 0) * (item.qty || 0));
-  }, 0) || order.total || 0;
+  const vehicleModel =
+    firstItem?.variant?.trim || firstItem?.variant?.model?.name || "N/A";
 
-  const status = order.status || 'new';
+  // Tính total từ items
+  const total =
+    order.items?.reduce((sum, item) => {
+      return sum + (item.unitPrice || 0) * (item.qty || 0);
+    }, 0) ||
+    order.total ||
+    0;
+
+  const status = order.status || "new";
 
   return (
     <Animated.View
@@ -425,12 +456,23 @@ const OrderCard = ({ order, navigation, index }) => {
     >
       <TouchableOpacity
         style={styles.orderCard}
-        onPress={() => navigation.navigate('OrderDetail', { orderId: order._id })}
+        onPress={() =>
+          navigation.navigate("OrderDetail", { orderId: order._id })
+        }
         activeOpacity={0.7}
       >
         <View style={styles.orderLeft}>
-          <View style={[styles.orderIcon, { backgroundColor: getStatusColor(status) + '15' }]}>
-            <Ionicons name="document-text" size={20} color={getStatusColor(status)} />
+          <View
+            style={[
+              styles.orderIcon,
+              { backgroundColor: getStatusColor(status) + "15" },
+            ]}
+          >
+            <Ionicons
+              name="document-text"
+              size={20}
+              color={getStatusColor(status)}
+            />
           </View>
           <View style={styles.orderInfo}>
             <Text style={styles.orderCustomer} numberOfLines={1}>
@@ -443,10 +485,17 @@ const OrderCard = ({ order, navigation, index }) => {
         </View>
         <View style={styles.orderRight}>
           <Text style={styles.orderAmount}>
-            {total.toLocaleString('vi-VN')} đ
+            {total.toLocaleString("vi-VN")} đ
           </Text>
-          <View style={[styles.statusPill, { backgroundColor: getStatusColor(status) + '20' }]}>
-            <Text style={[styles.statusPillText, { color: getStatusColor(status) }]}>
+          <View
+            style={[
+              styles.statusPill,
+              { backgroundColor: getStatusColor(status) + "20" },
+            ]}
+          >
+            <Text
+              style={[styles.statusPillText, { color: getStatusColor(status) }]}
+            >
               {status.charAt(0).toUpperCase() + status.slice(1)}
             </Text>
           </View>
@@ -483,7 +532,9 @@ const QuickActionButton = ({ icon, label, color, onPress }) => {
         onPressOut={handlePressOut}
         activeOpacity={0.9}
       >
-        <View style={[styles.quickActionIcon, { backgroundColor: color + '15' }]}>
+        <View
+          style={[styles.quickActionIcon, { backgroundColor: color + "15" }]}
+        >
           <Ionicons name={icon} size={28} color={color} />
         </View>
         <Text style={styles.quickActionLabel}>{label}</Text>
@@ -509,13 +560,13 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.md,
   },
   headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: theme.spacing.md,
   },
   headerTitle: {
-    fontSize: theme.typography.fontSize['2xl'],
+    fontSize: theme.typography.fontSize["2xl"],
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.textPrimary,
   },
@@ -534,15 +585,15 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
   },
   avatarContainer: {
-    position: 'relative',
+    position: "relative",
   },
   avatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
     backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     ...theme.shadow.sm,
   },
   avatarText: {
@@ -551,7 +602,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textWhite,
   },
   onlineIndicator: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
     width: 12,
@@ -572,9 +623,9 @@ const styles = StyleSheet.create({
     ...theme.shadow.md,
   },
   revenueHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: theme.spacing.md,
   },
   revenueLeft: {
@@ -583,10 +634,10 @@ const styles = StyleSheet.create({
   },
   revenueLabel: {
     fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.textWhite + 'DD',
+    color: theme.colors.textWhite + "DD",
     fontWeight: theme.typography.fontWeight.medium,
     marginBottom: theme.spacing.xs / 2,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   revenueAmount: {
@@ -599,24 +650,24 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.textWhite + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: theme.colors.textWhite + "20",
+    justifyContent: "center",
+    alignItems: "center",
   },
   revenueStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     paddingTop: theme.spacing.md,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.textWhite + '20',
+    borderTopColor: theme.colors.textWhite + "20",
   },
   revenueStatItem: {
-    alignItems: 'center',
+    alignItems: "center",
     flex: 1,
   },
   revenueStatLabel: {
     fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.textWhite + 'CC',
+    color: theme.colors.textWhite + "CC",
     marginBottom: 4,
   },
   revenueStatValue: {
@@ -626,7 +677,7 @@ const styles = StyleSheet.create({
   },
   revenueStatDivider: {
     width: 1,
-    backgroundColor: theme.colors.textWhite + '30',
+    backgroundColor: theme.colors.textWhite + "30",
   },
   statsCarouselContainer: {
     marginBottom: theme.spacing.lg,
@@ -635,27 +686,27 @@ const styles = StyleSheet.create({
     paddingLeft: PADDING_HORIZONTAL,
     paddingRight: PADDING_HORIZONTAL,
     gap: CARD_GAP,
-    alignItems: 'center',
+    alignItems: "center",
   },
   statCardWrapper: {
     width: CARD_WRAPPER_WIDTH,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   statCard: {
     width: CARD_WIDTH,
     backgroundColor: theme.colors.backgroundLight,
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.lg,
-    alignItems: 'center',
+    alignItems: "center",
     ...theme.shadow.card,
   },
   statIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: theme.spacing.sm,
   },
   statValue: {
@@ -668,20 +719,20 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.xs,
     color: theme.colors.textSecondary,
     fontWeight: theme.typography.fontWeight.medium,
-    textAlign: 'center',
+    textAlign: "center",
   },
   section: {
     paddingHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.lg,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: theme.spacing.lg,
   },
   sectionTitle: {
-    fontSize: theme.typography.fontSize['2xl'],
+    fontSize: theme.typography.fontSize["2xl"],
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.bold,
@@ -692,11 +743,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   seeAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: theme.spacing.xs,
     paddingHorizontal: theme.spacing.sm,
-    backgroundColor: theme.colors.primary + '10',
+    backgroundColor: theme.colors.primary + "10",
     borderRadius: theme.borderRadius.md,
   },
   seeAllText: {
@@ -709,17 +760,17 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   orderCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     backgroundColor: theme.colors.backgroundLight,
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.lg,
     ...theme.shadow.card,
   },
   orderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
     marginRight: theme.spacing.md,
   },
@@ -727,8 +778,8 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: theme.spacing.md,
   },
   orderInfo: {
@@ -745,7 +796,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
   orderRight: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   orderAmount: {
     fontSize: theme.typography.fontSize.base,
@@ -761,12 +812,12 @@ const styles = StyleSheet.create({
   statusPillText: {
     fontSize: theme.typography.fontSize.xs,
     fontWeight: theme.typography.fontWeight.semibold,
-    textTransform: 'capitalize',
+    textTransform: "capitalize",
   },
   emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing['4xl'],
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: theme.spacing["4xl"],
     backgroundColor: theme.colors.backgroundLight,
     borderRadius: theme.borderRadius.xl,
     marginTop: theme.spacing.sm,
@@ -776,8 +827,8 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     backgroundColor: theme.colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: theme.spacing.lg,
   },
   emptyTitle: {
@@ -804,33 +855,33 @@ const styles = StyleSheet.create({
     color: theme.colors.textWhite,
   },
   quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.spacing.md,
     marginTop: theme.spacing.md,
   },
   quickAction: {
     flex: 1,
-    minWidth: '45%',
+    minWidth: "45%",
     backgroundColor: theme.colors.backgroundLight,
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.lg,
-    alignItems: 'center',
+    alignItems: "center",
     ...theme.shadow.card,
   },
   quickActionIcon: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: theme.spacing.md,
   },
   quickActionLabel: {
     fontSize: theme.typography.fontSize.sm,
     fontWeight: theme.typography.fontWeight.semibold,
     color: theme.colors.textPrimary,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });
 

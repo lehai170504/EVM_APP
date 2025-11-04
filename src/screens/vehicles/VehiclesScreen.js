@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,15 @@ import {
   TouchableOpacity,
   RefreshControl,
   Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { vehicleService } from '../../services/vehicleService';
-import { Card } from '../../components/Card';
-import { Loading } from '../../components/Loading';
-import { theme } from '../../theme';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+  Animated,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { vehicleService } from "../../services/vehicleService";
+import { Card } from "../../components/Card";
+import { Loading } from "../../components/Loading";
+import { theme } from "../../theme";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 
 const VehiclesScreen = () => {
   const [vehicles, setVehicles] = useState([]);
@@ -31,7 +32,7 @@ const VehiclesScreen = () => {
       const data = await vehicleService.getVehicles();
       setVehicles(data);
     } catch (error) {
-      console.error('Load vehicles error:', error);
+      console.error("Load vehicles error:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -44,100 +45,151 @@ const VehiclesScreen = () => {
   };
 
   const renderVehicle = ({ item }) => {
-    const modelName = typeof item.model === 'object' ? item.model?.name : 'N/A';
-    // Lấy image từ nhiều nguồn có thể (ưu tiên images array)
-    let imageUrl = null;
-    if (item.images && Array.isArray(item.images) && item.images.length > 0 && item.images[0]) {
-      imageUrl = item.images[0];
-    } else if (item.model?.images && Array.isArray(item.model.images) && item.model.images.length > 0 && item.model.images[0]) {
-      imageUrl = item.model.images[0];
-    } else {
-      imageUrl = item.img || item.image || item.imageUrl || item.picture || item.model?.img || item.model?.image || item.model?.imageUrl;
-    }
-    
+    const modelName = typeof item.model === "object" ? item.model?.name : "N/A";
+    let imageUrl = item.images?.[0] || item.model?.images?.[0] || null;
+
+    // Animation khi nhấn
+    const scaleAnim = new Animated.Value(1);
+    const handlePressIn = () =>
+      Animated.spring(scaleAnim, {
+        toValue: 0.97,
+        useNativeDriver: true,
+      }).start();
+    const handlePressOut = () =>
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 4,
+        useNativeDriver: true,
+      }).start();
+
     return (
-      <Card style={styles.vehicleCard}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => navigation.navigate('VehicleDetail', { vehicleId: item._id })}
-          style={styles.cardContent}
-        >
-          {/* Vehicle Image - Small on left */}
-          <View style={styles.imageContainer}>
-            {imageUrl ? (
-              <Image
-                source={{ uri: imageUrl }}
-                style={styles.vehicleImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={styles.placeholderImage}>
-                <Ionicons name="car-outline" size={32} color={theme.colors.textTertiary} />
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <Card style={styles.vehicleCard}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            onPress={() =>
+              navigation.navigate("VehicleDetail", { vehicleId: item._id })
+            }
+          >
+            {/* Image header */}
+            <View style={styles.imageContainer}>
+              {imageUrl ? (
+                <Image
+                  source={{ uri: imageUrl }}
+                  style={styles.vehicleImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.placeholderImage}>
+                  <Ionicons
+                    name="car-sport-outline"
+                    size={40}
+                    color={theme.colors.textTertiary}
+                  />
+                </View>
+              )}
+              {/* Overlay badge */}
+              <View style={styles.badgeRow}>
+                {item.range && (
+                  <View style={styles.badge}>
+                    <Ionicons
+                      name="battery-charging"
+                      size={12}
+                      color={theme.colors.textWhite}
+                    />
+                    <Text style={styles.badgeText}>{item.range} km</Text>
+                  </View>
+                )}
+                {item.motorPower && (
+                  <View style={[styles.badge, { backgroundColor: "#FFB800" }]}>
+                    <Ionicons
+                      name="flash"
+                      size={12}
+                      color={theme.colors.textWhite}
+                    />
+                    <Text style={styles.badgeText}>{item.motorPower} kW</Text>
+                  </View>
+                )}
               </View>
-            )}
-          </View>
-          
-          {/* Vehicle Info - Right side */}
-          <View style={styles.infoContainer}>
-            <View style={styles.vehicleHeader}>
-              <View style={styles.vehicleInfo}>
-                <Text style={styles.vehicleModel}>{modelName}</Text>
-                <Text style={styles.vehicleTrim}>{item.trim}</Text>
-              </View>
-              <View style={styles.priceContainer}>
+            </View>
+
+            {/* Vehicle info */}
+            <View style={styles.infoContainer}>
+              <View style={styles.titleRow}>
+                <View>
+                  <Text style={styles.vehicleModel}>{modelName}</Text>
+                  <Text style={styles.vehicleTrim}>{item.trim}</Text>
+                </View>
                 <Text style={styles.price}>
-                  {item.msrp?.toLocaleString('vi-VN')} đ
+                  {item.msrp?.toLocaleString("vi-VN")} đ
                 </Text>
               </View>
-            </View>
-            
-            <View style={styles.specsContainer}>
-              {item.range && (
-                <View style={styles.specRow}>
-                  <Ionicons name="battery-charging" size={14} color={theme.colors.accent} />
-                  <Text style={styles.specText}>{item.range} km</Text>
+
+              {/* Colors preview */}
+              {item.colors?.length > 0 && (
+                <View style={styles.colorsRow}>
+                  {item.colors.slice(0, 5).map((color) => (
+                    <View
+                      key={color._id}
+                      style={[
+                        styles.colorDot,
+                        { backgroundColor: color.hex || "#ccc" },
+                      ]}
+                    />
+                  ))}
+                  {item.colors.length > 5 && (
+                    <Text style={styles.moreColors}>
+                      +{item.colors.length - 5}
+                    </Text>
+                  )}
                 </View>
               )}
-              
-              {item.motorPower && (
-                <View style={styles.specRow}>
-                  <Ionicons name="flash" size={14} color={theme.colors.warning} />
-                  <Text style={styles.specText}>{item.motorPower} kW</Text>
-                </View>
-              )}
             </View>
-          </View>
-        </TouchableOpacity>
-        
-        {/* Compare Icon Button */}
-        <TouchableOpacity
-          style={styles.compareIconButton}
-          onPress={() => navigation.navigate('VehicleCompare', { vehicleId: item._id })}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="swap-horizontal" size={20} color={theme.colors.primary} />
-        </TouchableOpacity>
-      </Card>
+          </TouchableOpacity>
+
+          {/* Compare button */}
+          <TouchableOpacity
+            style={styles.compareButton}
+            onPress={() =>
+              navigation.navigate("VehicleCompare", { vehicleId: item._id })
+            }
+          >
+            <Ionicons
+              name="git-compare-outline"
+              size={20}
+              color={theme.colors.primary}
+            />
+          </TouchableOpacity>
+        </Card>
+      </Animated.View>
     );
   };
 
-  if (loading) {
-    return <Loading />;
-  }
+  if (loading) return <Loading />;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <FlatList
         data={vehicles}
         renderItem={renderVehicle}
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={Boolean(refreshing)}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+          />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="car-outline" size={64} color={theme.colors.textTertiary} />
+            <Ionicons
+              name="car-outline"
+              size={64}
+              color={theme.colors.textTertiary}
+            />
             <Text style={styles.emptyText}>Không có xe nào</Text>
           </View>
         }
@@ -153,97 +205,108 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: theme.spacing.lg,
+    paddingBottom: 100,
   },
   vehicleCard: {
-    marginBottom: theme.spacing.md,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  cardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+    borderRadius: theme.borderRadius["2xl"],
+    overflow: "hidden",
+    backgroundColor: "#fff",
+    ...theme.shadow.md,
   },
   imageContainer: {
-    width: 100,
-    height: 100,
-    marginRight: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    overflow: 'hidden',
-    backgroundColor: theme.colors.background,
+    height: 180,
+    width: "100%",
+    backgroundColor: theme.colors.backgroundLight,
+    position: "relative",
   },
   vehicleImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   placeholderImage: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background + '80',
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeRow: {
+    position: "absolute",
+    bottom: theme.spacing.sm,
+    left: theme.spacing.sm,
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+  },
+  badge: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  badgeText: {
+    fontSize: 11,
+    color: theme.colors.textWhite,
+    fontWeight: "500",
   },
   infoContainer: {
-    flex: 1,
-    paddingRight: 40, // Space for compare icon
+    padding: theme.spacing.md,
   },
-  vehicleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: theme.spacing.xs,
-  },
-  vehicleInfo: {
-    flex: 1,
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
   },
   vehicleModel: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.semibold,
+    fontSize: 18,
+    fontWeight: "700",
     color: theme.colors.textPrimary,
-    marginBottom: 2,
   },
   vehicleTrim: {
-    fontSize: theme.typography.fontSize.sm,
+    fontSize: 13,
     color: theme.colors.textSecondary,
-  },
-  priceContainer: {
-    alignItems: 'flex-end',
+    marginTop: 2,
   },
   price: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.bold,
+    fontSize: 16,
+    fontWeight: "bold",
     color: theme.colors.primary,
   },
-  specsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.xs,
+  colorsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: theme.spacing.sm,
+    gap: 6,
   },
-  specRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs / 2,
+  colorDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ccc",
   },
-  specText: {
-    fontSize: theme.typography.fontSize.xs,
+  moreColors: {
+    fontSize: 12,
     color: theme.colors.textSecondary,
   },
-  compareIconButton: {
-    position: 'absolute',
-    top: theme.spacing.md,
-    right: theme.spacing.md,
+  compareButton: {
+    position: "absolute",
+    top: 12,
+    right: 12,
     width: 36,
     height: 36,
+    backgroundColor: theme.colors.primary + "15",
     borderRadius: 18,
-    backgroundColor: theme.colors.primary + '15',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     ...theme.shadow.sm,
   },
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing['5xl'],
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: theme.spacing["5xl"],
   },
   emptyText: {
     marginTop: theme.spacing.md,
@@ -253,4 +316,3 @@ const styles = StyleSheet.create({
 });
 
 export default VehiclesScreen;
-

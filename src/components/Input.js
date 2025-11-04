@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, TextInput, Text, StyleSheet } from 'react-native';
-import { theme } from '../theme';
+import React from "react";
+import { View, TextInput, Text, StyleSheet } from "react-native";
+import { theme } from "../theme";
 
 export const Input = ({
   label,
@@ -9,7 +9,7 @@ export const Input = ({
   placeholder,
   error,
   secureTextEntry = false,
-  keyboardType = 'default',
+  keyboardType = "default",
   multiline = false,
   numberOfLines = 1,
   style,
@@ -36,16 +36,20 @@ export const Input = ({
         placeholder={placeholder}
         placeholderTextColor={theme.colors.textTertiary}
         secureTextEntry={Boolean(secureTextEntry)}
-        keyboardType={keyboardType || 'default'}
+        keyboardType={keyboardType || "default"}
         multiline={Boolean(multiline)}
         numberOfLines={Number(numberOfLines) || 1}
         {...(autoCapitalize && { autoCapitalize })}
         {...(autoComplete && { autoComplete })}
-        {...(autoCorrect !== undefined && { autoCorrect: Boolean(autoCorrect) })}
+        {...(autoCorrect !== undefined && {
+          autoCorrect: Boolean(autoCorrect),
+        })}
         {...(editable !== undefined && { editable: Boolean(editable) })}
         {...(returnKeyType && { returnKeyType })}
         {...(onSubmitEditing && { onSubmitEditing })}
-        {...(blurOnSubmit !== undefined && { blurOnSubmit: Boolean(blurOnSubmit) })}
+        {...(blurOnSubmit !== undefined && {
+          blurOnSubmit: Boolean(blurOnSubmit),
+        })}
       />
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
@@ -77,7 +81,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.error,
   },
   inputMultiline: {
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
     minHeight: 80,
   },
   errorText: {
@@ -86,4 +90,3 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xs,
   },
 });
-
