@@ -4,50 +4,40 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
+  Modal,
+  FlatList,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import FlashMessage, { showMessage } from "react-native-flash-message";
 
-// 1. Import TẤT CẢ service cần thiết
 import { testDriveService } from "../../services/testDrivesService";
 import { customerService } from "../../services/customerService";
 import { vehicleService } from "../../services/vehicleService";
-
+import { dealerService } from "../../services/dealerService";
 import { Button } from "../../components/Button";
-import { Input } from "../../components/Input";
 import { Loading } from "../../components/Loading";
 import { theme } from "../../theme";
+import { useAuth } from "../../context/AuthContext";
 
-// Giả định: Các entities chưa có service (như Dealer, Staff)
-const DUMMY_ENTITIES = {
-  dealers: [
-    { _id: "68f90ebebeaef72ecf6e005b", name: "Đại lý EV Hà Nội" },
-    { _id: "D_002", name: "Đại lý EV Hồ Chí Minh" },
-  ],
-  staffs: [
-    { _id: "68f90ebebeaef72ecf6e005d", fullName: "Nhân viên Phụ trách A" },
-    { _id: "S_002", fullName: "Nhân viên Phụ trách B" },
-  ],
-};
-
-// Component helper cho việc chọn
 const SelectionField = ({ label, value, onPress, required = false }) => (
-  <View style={createStyles.selectionContainer}>
-    <Text style={createStyles.label}>
-      {label}{" "}
+  <View style={styles.selectionContainer}>
+    <Text style={styles.label}>
+      {label}
       {required && <Text style={{ color: theme.colors.danger }}>*</Text>}
     </Text>
     <TouchableOpacity
-      style={createStyles.selectionInput}
+      style={styles.selectionInput}
       onPress={onPress}
       activeOpacity={0.7}
     >
       <Text
         style={[
-          createStyles.selectionText,
+          styles.selectionText,
           !value && { color: theme.colors.textSecondary },
         ]}
         numberOfLines={1}
@@ -65,285 +55,335 @@ const SelectionField = ({ label, value, onPress, required = false }) => (
 
 const CreateTestDriveScreen = () => {
   const navigation = useNavigation();
+  const { user } = useAuth();
+
+  // ✅ Danh sách trạng thái
+  const statusOptions = [
+    { label: "Đã yêu cầu", value: "requested" },
+    { label: "Đã xác nhận", value: "confirmed" },
+    { label: "Hoàn thành", value: "completed" },
+  ];
+
   const [data, setData] = useState({
     customers: [],
     variants: [],
-    dealers: DUMMY_ENTITIES.dealers,
-    staffs: DUMMY_ENTITIES.staffs,
+    dealers: [],
   });
+
   const [formData, setFormData] = useState({
     customer: null,
-    dealer: DUMMY_ENTITIES.dealers[0]?._id || null,
     variant: null,
-    preferredTime: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
-    assignedStaff: DUMMY_ENTITIES.staffs[0]?._id || null,
+    dealer: null,
+    preferredTime: new Date(Date.now() + 86400000),
+    status: "requested",
   });
+
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectModal, setSelectModal] = useState({ visible: false, type: "" });
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // --- Logic Fetch Data ---
   useEffect(() => {
-    const loadRequiredData = async () => {
+    const loadData = async () => {
       try {
-        const [customersData, vehiclesData] = await Promise.all([
+        const [customersData, vehiclesData, dealersData] = await Promise.all([
           customerService.getCustomers(),
           vehicleService.getVehicles(),
+          dealerService.getDealers(),
         ]);
 
-        const customers = Array.isArray(customersData)
-          ? customersData
-          : customersData.data || [];
-        const variants = Array.isArray(vehiclesData)
-          ? vehiclesData
-          : vehiclesData.data || [];
-
-        // Lấy dữ liệu cần thiết: fullName/phone và trim/name
-        setData((prev) => ({
-          ...prev,
-          customers: customers.map((c) => ({
+        setData({
+          customers: (customersData?.data || customersData || []).map((c) => ({
             _id: c._id,
             fullName: c.fullName,
             phone: c.phone,
           })),
-          variants: variants.map((v) => ({
+          variants: (vehiclesData?.data || vehiclesData || []).map((v) => ({
             _id: v._id,
             name: v.trim || v.model?.name || `Phiên bản #${v._id.slice(-4)}`,
           })),
-        }));
-
-        // Thiết lập giá trị mặc định cho form
-        if (customers.length > 0)
-          setFormData((prev) => ({ ...prev, customer: customers[0]._id }));
-        if (variants.length > 0)
-          setFormData((prev) => ({ ...prev, variant: variants[0]._id }));
+          dealers: (dealersData?.data || dealersData || []).map((d) => ({
+            _id: d._id,
+            name: d.name || d.dealerName || `Đại lý #${d._id.slice(-4)}`,
+          })),
+        });
       } catch (error) {
-        console.error("Load essential data error:", error);
-        Alert.alert(
-          "Lỗi tải dữ liệu",
-          "Không thể tải danh sách Khách hàng/Xe. Vui lòng kiểm tra kết nối API."
-        );
+        console.error("Load data error:", error);
+        showMessage({
+          message: "Không thể tải dữ liệu",
+          description: "Lỗi khi tải danh sách khách hàng, xe hoặc đại lý.",
+          type: "danger",
+        });
       } finally {
         setLoading(false);
       }
     };
-
-    loadRequiredData();
+    loadData();
   }, []);
 
-  // --- Logic Form Handling ---
-  const handleChange = (name, value) => {
-    setFormData({ ...formData, [name]: value });
+  const handleChange = (key, value) => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const getSelectedItem = (list, id, key = "_id") =>
-    list.find((item) => item[key] === id);
-
-  const handleCreateTestDrive = async () => {
-    // 1. Validate
+  const handleCreate = async () => {
     if (
       !formData.customer ||
+      !formData.variant ||
       !formData.dealer ||
-      !formData.preferredTime ||
-      !formData.variant
+      !formData.preferredTime
     ) {
-      Alert.alert(
-        "Thiếu thông tin",
-        "Vui lòng chọn đầy đủ các trường bắt buộc."
-      );
+      showMessage({
+        message: "Thiếu thông tin",
+        description: "Vui lòng chọn đầy đủ thông tin bắt buộc.",
+        type: "warning",
+      });
       return;
     }
 
-    setIsSubmitting(true);
+    if (!user?._id) {
+      showMessage({
+        message: "Lỗi người dùng",
+        description: "Không xác định được tài khoản đang đăng nhập.",
+        type: "danger",
+      });
+      return;
+    }
+
     try {
-      // 2. Chuẩn bị request body
+      setIsSubmitting(true);
       const requestBody = {
         customer: formData.customer,
-        dealer: formData.dealer,
         variant: formData.variant,
-        preferredTime: new Date(formData.preferredTime).toISOString(),
-        status: "requested",
-        assignedStaff: formData.assignedStaff,
+        dealer: formData.dealer,
+        assignedStaff: user._id,
+        preferredTime: formData.preferredTime.toISOString(),
+        status: formData.status,
       };
 
-      // 3. Gọi API thực tế
-      await testDriveService.create(requestBody);
+      await testDriveService.createTestDrive(requestBody);
 
-      Alert.alert("Thành công 🎉", "Lịch lái thử đã được tạo thành công!");
+      showMessage({
+        message: "Tạo lịch lái thử thành công!",
+        type: "success",
+      });
       navigation.goBack();
     } catch (error) {
-      console.error(
-        "Create test drive error:",
-        error.response?.data || error.message
-      );
-      const errorMessage =
-        error.response?.data?.message ||
-        "Đã xảy ra lỗi trong quá trình tạo lịch lái thử. Vui lòng kiểm tra định dạng thời gian.";
-      Alert.alert("Lỗi", errorMessage);
+      console.error("Create test drive error:", error);
+      showMessage({
+        message: "Không thể tạo lịch lái thử",
+        description: "Vui lòng thử lại sau.",
+        type: "danger",
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (loading) {
-    return <Loading />;
-  }
+  const renderSelectModal = () => {
+    if (!selectModal.visible) return null;
+    let items = [];
+    let title = "";
 
-  // Lấy tên hiển thị
-  const selectedCustomer = getSelectedItem(data.customers, formData.customer);
-  const selectedDealer = getSelectedItem(data.dealers, formData.dealer);
-  const selectedVariant = getSelectedItem(data.variants, formData.variant);
-  const selectedStaff = getSelectedItem(data.staffs, formData.assignedStaff);
+    switch (selectModal.type) {
+      case "customer":
+        items = data.customers;
+        title = "Chọn khách hàng";
+        break;
+      case "variant":
+        items = data.variants;
+        title = "Chọn xe";
+        break;
+      case "dealer":
+        items = data.dealers;
+        title = "Chọn đại lý";
+        break;
+      case "status":
+        items = statusOptions;
+        title = "Chọn trạng thái";
+        break;
+    }
 
-  const customerDisplay = selectedCustomer
-    ? `${selectedCustomer.fullName} - ${selectedCustomer.phone}`
-    : data.customers.length === 0
-    ? "Chưa có khách hàng nào"
-    : null;
+    return (
+      <Modal transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{title}</Text>
+            <FlatList
+              data={items}
+              keyExtractor={(item) => item._id || item.value}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItem}
+                  onPress={() => {
+                    handleChange(
+                      selectModal.type,
+                      item._id || item.value // ✅ dùng _id cho API data, value cho status
+                    );
+                    setSelectModal({ visible: false, type: "" });
+                  }}
+                >
+                  <Text style={styles.modalItemText}>
+                    {item.fullName || item.name || item.phone || item.label}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+            <Button
+              title="Đóng"
+              variant="secondary"
+              onPress={() => setSelectModal({ visible: false, type: "" })}
+              style={{ marginTop: theme.spacing.md }}
+            />
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
-  const variantDisplay = selectedVariant
-    ? selectedVariant.name
-    : data.variants.length === 0
-    ? "Chưa có phiên bản xe nào"
-    : null;
+  if (loading) return <Loading />;
 
-  const dealerDisplay = selectedDealer ? selectedDealer.name : null;
-  const staffDisplay = selectedStaff ? selectedStaff.fullName : null;
+  const selectedCustomer = data.customers.find(
+    (c) => c._id === formData.customer
+  );
+  const selectedVariant = data.variants.find((v) => v._id === formData.variant);
+  const selectedDealer = data.dealers.find((d) => d._id === formData.dealer);
+  const selectedStatus = statusOptions.find((s) => s.value === formData.status);
 
   return (
-    <SafeAreaView style={createStyles.container} edges={["top", "bottom"]}>
-      <ScrollView contentContainerStyle={createStyles.scrollContent}>
-        <Text style={createStyles.title}>Tạo Lịch Lái Thử Mới</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.title}>Tạo Lịch Lái Thử</Text>
 
-        {/* Khách hàng - Mô phỏng chọn */}
         <SelectionField
           label="Khách hàng"
-          value={customerDisplay}
-          required={true}
-          onPress={() =>
-            Alert.alert(
-              "Chọn Khách hàng",
-              `Mô phỏng chọn: Đã chọn ${customerDisplay}`
-            )
+          value={
+            selectedCustomer
+              ? `${selectedCustomer.fullName} - ${selectedCustomer.phone}`
+              : ""
           }
+          required
+          onPress={() => setSelectModal({ visible: true, type: "customer" })}
         />
 
-        {/* Đại lý - Mô phỏng chọn */}
         <SelectionField
           label="Đại lý"
-          value={dealerDisplay}
-          required={true}
-          onPress={() =>
-            Alert.alert(
-              "Chọn Đại lý",
-              `Mô phỏng chọn: Đã chọn ${dealerDisplay}`
-            )
-          }
+          value={selectedDealer ? selectedDealer.name : ""}
+          required
+          onPress={() => setSelectModal({ visible: true, type: "dealer" })}
         />
 
-        {/* Phiên bản xe - Mô phỏng chọn */}
         <SelectionField
           label="Phiên bản xe"
-          value={variantDisplay}
-          required={true}
-          onPress={() =>
-            Alert.alert(
-              "Chọn Phiên bản",
-              `Mô phỏng chọn: Đã chọn ${variantDisplay}`
-            )
-          }
+          value={selectedVariant ? selectedVariant.name : ""}
+          required
+          onPress={() => setSelectModal({ visible: true, type: "variant" })}
         />
 
-        {/* Thời gian mong muốn */}
-        <Text style={createStyles.label}>
-          Thời gian mong muốn (YYYY-MM-DDTHH:MM)
-          <Text style={{ color: theme.colors.danger }}>*</Text>
-        </Text>
-        <Input
-          placeholder="Ví dụ: 2025-12-26T10:00"
-          value={formData.preferredTime}
-          onChangeText={(text) => handleChange("preferredTime", text)}
-          style={createStyles.input}
-        />
-
-        {/* Nhân viên phụ trách - Mô phỏng chọn */}
         <SelectionField
-          label="Nhân viên phụ trách"
-          value={staffDisplay}
-          onPress={() =>
-            Alert.alert(
-              "Chọn Nhân viên",
-              `Mô phỏng chọn: Đã chọn ${staffDisplay}`
-            )
-          }
+          label="Trạng thái"
+          value={selectedStatus?.label || ""}
+          onPress={() => setSelectModal({ visible: true, type: "status" })}
         />
+
+        <Text style={styles.label}>Thời gian mong muốn*</Text>
+        <TouchableOpacity
+          style={styles.selectionInput}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <Text style={styles.selectionText}>
+            {formData.preferredTime.toLocaleString("vi-VN", {
+              dateStyle: "short",
+              timeStyle: "short",
+            })}
+          </Text>
+          <Ionicons
+            name="calendar-outline"
+            size={20}
+            color={theme.colors.textSecondary}
+          />
+        </TouchableOpacity>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={formData.preferredTime}
+            mode="datetime"
+            display={Platform.OS === "ios" ? "inline" : "default"}
+            onChange={(event, date) => {
+              setShowDatePicker(false);
+              if (date) handleChange("preferredTime", date);
+            }}
+          />
+        )}
 
         <Button
           title="Tạo Lịch Lái Thử"
+          onPress={handleCreate}
           variant="primary"
-          size="lg"
-          onPress={handleCreateTestDrive}
-          style={createStyles.button}
           loading={isSubmitting}
-          disabled={
-            isSubmitting ||
-            !formData.customer ||
-            !formData.variant ||
-            !formData.dealer
-          }
+          disabled={isSubmitting}
+          style={{ marginTop: theme.spacing.xl }}
         />
       </ScrollView>
+
+      {renderSelectModal()}
+      <FlashMessage position="top" />
     </SafeAreaView>
   );
 };
 
-const createStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  scrollContent: {
-    padding: theme.spacing.lg,
-  },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  scrollContent: { padding: theme.spacing.lg },
   title: {
     fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.xl,
     textAlign: "center",
+    marginBottom: theme.spacing.xl,
   },
   label: {
     fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.medium,
     color: theme.colors.textSecondary,
     marginBottom: theme.spacing.xs,
     marginTop: theme.spacing.md,
   },
-  input: {
-    marginBottom: 0,
-  },
-  button: {
-    marginTop: theme.spacing["3xl"],
-  },
-  selectionContainer: {
-    marginBottom: theme.spacing.md,
-  },
+  selectionContainer: { marginBottom: theme.spacing.md },
   selectionInput: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
-    backgroundColor: theme.colors.inputBackground,
-    borderRadius: theme.borderRadius.md,
     borderWidth: 1,
+    borderRadius: theme.borderRadius.md,
     borderColor: theme.colors.border,
-    minHeight: 44,
+    backgroundColor: theme.colors.inputBackground,
   },
-  selectionText: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textPrimary,
+  selectionText: { flex: 1, color: theme.colors.textPrimary },
+  modalOverlay: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
+  modalContainer: {
+    width: "85%",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    maxHeight: "70%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  modalItem: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderColor: "#eee",
+  },
+  modalItemText: { fontSize: 16 },
 });
 
 export default CreateTestDriveScreen;

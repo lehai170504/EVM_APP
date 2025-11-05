@@ -90,8 +90,14 @@ const TestDrivesScreen = () => {
   const renderTestDrive = ({ item }) => (
     <TouchableOpacity
       onPress={() => {
-        setSelectedTestDrive(item);
-        if (item.status === "confirmed") setOpenFeedbackModal(true);
+        // Nếu đang xác nhận -> mở modal phản hồi
+        if (item.status === "confirmed") {
+          setSelectedTestDrive(item);
+          setOpenFeedbackModal(true);
+        } else {
+          // Nếu không -> chuyển sang trang chi tiết
+          navigation.navigate("TestDriveDetail", { testDriveId: item._id });
+        }
       }}
     >
       <Card style={styles.card}>

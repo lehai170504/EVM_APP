@@ -26,6 +26,7 @@ import CustomerDetailScreen from "../screens/customers/CustomerDetailScreen";
 import CreateCustomerScreen from "../screens/customers/CreateCustomerScreen";
 import ReportsScreen from "../screens/ReportsScreen";
 import SettingsScreen from "../screens/SettingsScreen";
+import VehicleComparisonResultScreen from "../screens/vehicles/VehicleComparisonResultScreen";
 
 // Test Drive Screens
 import TestDrivesScreen from "../screens/testDrives/TestDrivesScreen";
@@ -245,6 +246,10 @@ const AppNavigator = () => {
               name="TestDriveDetail"
               component={TestDriveDetailScreen}
               options={screenHeader("Chi tiết lịch lái thử")}
+            />
+            <Stack.Screen
+              name="VehicleComparisonResult"
+              component={VehicleComparisonResultScreen}
             />
           </>
         )}

@@ -422,11 +422,12 @@ const OrderDetailScreen = ({ route }) => {
           />
         )}
 
-        {/* NÚT CẬP NHẬT TRẠNG THÁI DELIVERY */}
-        {delivery && (
+        {/* HIỂN THỊ TRẠNG THÁI GIAO HÀNG — CHỈ KHI ĐÃ TẠO DELIVERY */}
+        {delivery?._id && (
           <Card>
             <Text style={styles.cardTitle}>Trạng thái giao hàng</Text>
             <StatusBadge status={delivery.status} />
+
             {delivery.status === "pending" && (
               <Button
                 title="Bắt đầu giao hàng"
@@ -436,6 +437,7 @@ const OrderDetailScreen = ({ route }) => {
                 onPress={() => handleUpdateDeliveryStatus("in_progress")}
               />
             )}
+
             {delivery.status === "in_progress" && (
               <Button
                 title="Đánh dấu đã giao"

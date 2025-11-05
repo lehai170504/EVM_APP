@@ -23,7 +23,7 @@ const TestDriveDetailScreen = () => {
   useEffect(() => {
     const fetchTestDriveDetail = async () => {
       try {
-        const data = await testDriveService.getById(testDriveId);
+        const data = await testDriveService.getTestDriveById(testDriveId);
         setTestDrive(data);
       } catch (error) {
         console.error("Load test drive detail error:", error);

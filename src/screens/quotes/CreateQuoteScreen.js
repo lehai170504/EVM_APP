@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,10 @@ import {
   Modal,
   FlatList,
   TextInput,
+  Alert, // Sử dụng Alert thay vì showMessage cho validation ngay trên màn hình
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+// Giả định rằng các service và component của bạn đã được import đúng
 import { quoteService } from "../../services/quoteService";
 import { customerService } from "../../services/customerService";
 import { vehicleService } from "../../services/vehicleService";
@@ -44,7 +46,7 @@ const CreateQuoteScreen = ({ navigation }) => {
   const [notes, setNotes] = useState("");
 
   const [subtotal, setSubtotal] = useState(0);
-  const [promotionTotal, setPromotionTotal] = useState(0);
+  const [promotionTotal, setPromotionTotal] = useState(0); // Giảm giá thực tế sau khi check Scope
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -58,12 +60,96 @@ const CreateQuoteScreen = ({ navigation }) => {
     loadData();
   }, []);
 
+  // --- HÀM TÍNH TOÁN TỔNG (BAO GỒM CHECK SCOPE) ---
+  const recalculateTotals = useCallback(() => {
+    // 1. Tính Subtotal (Đã bao gồm phụ phí màu sắc)
+    const sub = items.reduce(
+      (sum, item) => sum + (item.unitPrice || 0) * (item.qty || 0),
+      0
+    );
+
+    // 2. Tính Promotion Total (Có kiểm tra điều kiện Scope)
+    let promoTotal = 0;
+
+    if (selectedPromotion && sub > 0) {
+      const promotion = selectedPromotion;
+      let applicable = true;
+      let calculatedDiscount = 0;
+
+      // --- 2.1. Kiểm tra Scope ---
+      if (promotion.scope === "byDealer") {
+        // Giả định: dealerId của khuyến mãi phải khớp với dealerId của khách hàng
+        // LƯU Ý: Nếu selectedCustomer.dealerId không tồn tại, KHUYẾN MÃI NÀY SẼ KHÔNG ÁP DỤNG
+        const customerDealerId = selectedCustomer?.dealerId;
+        const dealerIdsInPromo = promotion.dealers?.map((d) => d._id) || [];
+
+        if (!customerDealerId || !dealerIdsInPromo.includes(customerDealerId)) {
+          applicable = false;
+        }
+      } else if (promotion.scope === "byVariant") {
+        // Kiểm tra xem ít nhất một sản phẩm trong báo giá có nằm trong danh sách 'variants' của khuyến mãi không
+        const promoVariantIds = promotion.variants?.map((v) => v._id) || [];
+        const itemsInQuoteVariantIds = items
+          .map((item) => item.variant)
+          .filter((id) => id); // Lọc bỏ id rỗng
+
+        const isAnyItemCovered = itemsInQuoteVariantIds.some((itemId) =>
+          promoVariantIds.includes(itemId)
+        );
+
+        if (!isAnyItemCovered) {
+          applicable = false;
+        }
+      }
+      // --- 2.2. Kiểm tra Ngày Hết Hạn (Làm thêm 1 lần nữa để đảm bảo) ---
+      const now = new Date();
+      if (promotion.validTo && now > new Date(promotion.validTo)) {
+        applicable = false;
+      }
+
+      // 2.3. Tính toán giảm giá nếu hợp lệ
+      if (applicable) {
+        if (promotion.discountAmount) {
+          calculatedDiscount = Math.min(promotion.discountAmount, sub);
+        } else if (promotion.discountPercent) {
+          calculatedDiscount = (sub * promotion.discountPercent) / 100;
+        } else if (promotion.type === "accessory" && promotion.value) {
+          // Tạm thời coi value của 'accessory' là giảm giá tiền mặt
+          calculatedDiscount = Math.min(promotion.value, sub);
+        }
+
+        promoTotal = calculatedDiscount;
+
+        // Nếu đã áp dụng, không cần cảnh báo. Nếu không áp dụng, logic bên dưới sẽ xử lý
+      } else {
+        // Có khuyến mãi được chọn, nhưng không áp dụng được
+        promoTotal = 0;
+      }
+    }
+
+    setSubtotal(sub);
+    setPromotionTotal(promoTotal);
+
+    // 3. Tính Tổng cộng (Total)
+    const totalAmount =
+      sub -
+      promoTotal +
+      (fees.registration || 0) +
+      (fees.plate || 0) +
+      (fees.delivery || 0);
+
+    setTotal(totalAmount);
+  }, [items, fees, selectedPromotion, selectedCustomer]); // Dependency list đầy đủ
+
   useEffect(() => {
-    calculateTotal();
-  }, [items, fees, selectedPromotion]);
+    recalculateTotals();
+  }, [recalculateTotals]);
+
+  // --- PHẦN CÒN LẠI CỦA LOGIC ---
 
   const loadData = async () => {
     try {
+      // ... (Giữ nguyên logic loadData)
       const [customersData, vehiclesData, colorsData, promotionsData] =
         await Promise.all([
           customerService.getCustomers(),
@@ -87,35 +173,16 @@ const CreateQuoteScreen = ({ navigation }) => {
       );
     } catch (error) {
       console.error("Load data error:", error);
-      alert(
-        "Tải dữ liệu thất bại: " +
-          (error.response?.data?.message || error.message)
-      );
+      showMessage({
+        message: "Lỗi tải dữ liệu",
+        description:
+          "Tải dữ liệu thất bại: " +
+          (error.response?.data?.message || error.message),
+        type: "danger",
+      });
     } finally {
       setLoading(false);
     }
-  };
-
-  const calculateTotal = () => {
-    const sub = items.reduce(
-      (sum, item) => sum + (item.unitPrice || 0) * (item.qty || 0),
-      0
-    );
-    setSubtotal(sub);
-    const promoTotal = selectedPromotion
-      ? selectedPromotion.discountAmount || selectedPromotion.discountPercent
-        ? selectedPromotion.discountAmount ||
-          (sub * (selectedPromotion.discountPercent || 0)) / 100
-        : 0
-      : 0;
-    setPromotionTotal(promoTotal);
-    const totalAmount =
-      sub -
-      promoTotal +
-      (fees.registration || 0) +
-      (fees.plate || 0) +
-      (fees.delivery || 0);
-    setTotal(totalAmount);
   };
 
   const updateItem = (index, field, value) => {
@@ -125,11 +192,25 @@ const CreateQuoteScreen = ({ navigation }) => {
     if (field === "variant") {
       const vehicle = vehicles.find((v) => v._id === value);
       if (vehicle) {
+        // Đặt giá cơ bản MSRP
         newItems[index].unitPrice = vehicle.msrp || 0;
-        newItems[index].color = ""; // Reset color when variant changes
+        newItems[index].color = ""; // Reset màu
       }
     }
 
+    if (field === "color") {
+      const selectedVehicle = vehicles.find(
+        (v) => v._id === newItems[index].variant
+      );
+      const selectedColor = colors.find((c) => c._id === value);
+
+      // Tính lại UnitPrice: MSRP + Phụ phí màu (extraPrice)
+      const msrp = selectedVehicle?.msrp || 0;
+      const extraPrice = selectedColor?.extraPrice || 0;
+      newItems[index].unitPrice = msrp + extraPrice;
+    }
+
+    // Cập nhật sau khi có thể đã thay đổi unitPrice do chọn variant/color
     setItems(newItems);
   };
 
@@ -145,7 +226,7 @@ const CreateQuoteScreen = ({ navigation }) => {
 
   const handleSubmit = async () => {
     if (!selectedCustomer) {
-      alert("Vui lòng chọn khách hàng");
+      Alert.alert("Lỗi", "Vui lòng chọn khách hàng");
       return;
     }
 
@@ -154,11 +235,37 @@ const CreateQuoteScreen = ({ navigation }) => {
         (item) => !item.variant || item.qty <= 0 || item.unitPrice <= 0
       )
     ) {
-      alert("Vui lòng điền đầy đủ thông tin sản phẩm");
+      Alert.alert(
+        "Lỗi",
+        "Vui lòng điền đầy đủ thông tin sản phẩm (Mẫu xe, Số lượng, Đơn giá > 0)"
+      );
       return;
     }
 
+    // Kiểm tra nhanh lại xem promotionTotal có đang bị lỗi không
+    if (selectedPromotion && promotionTotal === 0 && subtotal > 0) {
+      Alert.alert(
+        "Cảnh báo Khuyến mãi",
+        `Khuyến mãi "${selectedPromotion.name}" được chọn nhưng không được áp dụng do không thỏa mãn điều kiện (Scope hoặc Hết hạn). Bạn có muốn tiếp tục tạo báo giá không?`,
+        [
+          { text: "Hủy", style: "cancel" },
+          { text: "Tiếp tục", onPress: () => proceedSubmit() },
+        ]
+      );
+      return;
+    }
+
+    // Nếu không có cảnh báo hoặc đã đồng ý cảnh báo
+    proceedSubmit();
+  };
+
+  const proceedSubmit = async () => {
     setSubmitting(true);
+
+    // LƯU Ý QUAN TRỌNG:
+    // Chúng ta sử dụng state subtotal, promotionTotal, và total đã được tính toán
+    // chính xác trong useEffect (bao gồm cả kiểm tra Scope).
+
     try {
       const quoteData = {
         customer: selectedCustomer._id,
@@ -166,15 +273,17 @@ const CreateQuoteScreen = ({ navigation }) => {
           variant: item.variant,
           ...(item.color && { color: item.color }),
           qty: item.qty,
-          unitPrice: item.unitPrice,
+          unitPrice: item.unitPrice, // UnitPrice ĐÃ BAO GỒM PHỤ PHÍ MÀU
         })),
         subtotal,
         discount: 0,
-        promotionTotal: promotionTotal || 0,
+        promotion: selectedPromotion ? selectedPromotion._id : undefined, // Gửi ID khuyến mãi đã chọn
+        promotionTotal: promotionTotal, // Giảm giá thực tế đã kiểm tra
         fees,
-        total,
+        total: total, // Tổng đã trừ giảm giá thực tế
         ...(validUntil && { validUntil: validUntil.toISOString() }),
         ...(notes.trim() && { notes: notes.trim() }),
+        // ... (Thông tin dealer nếu cần)
       };
 
       const result = await quoteService.createQuote(quoteData);
@@ -221,6 +330,7 @@ const CreateQuoteScreen = ({ navigation }) => {
   };
 
   const renderDatePickerModal = () => {
+    // ... (Giữ nguyên component renderDatePickerModal)
     const daysInMonth = getDaysInMonth(selectedYear, selectedMonth);
     const years = Array.from(
       { length: 10 },
@@ -345,12 +455,27 @@ const CreateQuoteScreen = ({ navigation }) => {
         </View>
       </Modal>
     );
+    // ...
   };
 
   const renderPromotionItem = ({ item }) => (
     <TouchableOpacity
       style={styles.modalItem}
       onPress={() => {
+        // Kiểm tra điều kiện áp dụng cơ bản (Ngày hết hạn) ngay tại đây
+        const now = new Date();
+        const validTo = new Date(item.validTo);
+
+        if (item.validTo && now > validTo) {
+          showMessage({
+            message: "Khuyến mãi hết hạn",
+            description: `Khuyến mãi "${item.name}" đã hết hạn.`,
+            type: "warning",
+          });
+          return;
+        }
+
+        // Logic: Chỉ cho phép chọn 1 khuyến mãi.
         setSelectedPromotion(item);
         setPromotionModalVisible(false);
       }}
@@ -358,11 +483,14 @@ const CreateQuoteScreen = ({ navigation }) => {
       <View style={styles.modalItemContent}>
         <Text style={styles.modalItemTitle}>{item.name || item.title}</Text>
         <Text style={styles.modalItemSubtitle}>
+          Phạm vi: **{item.scope}** | Loại: **{item.type}**
           {item.discountAmount
-            ? `Giảm ${item.discountAmount.toLocaleString("vi-VN")} đ`
+            ? ` (Giảm ${item.discountAmount.toLocaleString("vi-VN")} đ)`
             : item.discountPercent
-            ? `Giảm ${item.discountPercent}%`
-            : "Khuyến mãi"}
+            ? ` (Giảm ${item.discountPercent}%)`
+            : item.value
+            ? ` (Giảm ${item.value.toLocaleString("vi-VN")} đ)`
+            : "Không rõ mức giảm"}
         </Text>
       </View>
       {selectedPromotion?._id === item._id && (
@@ -376,6 +504,7 @@ const CreateQuoteScreen = ({ navigation }) => {
   );
 
   const renderCustomerItem = ({ item }) => (
+    // ... (Giữ nguyên renderCustomerItem)
     <TouchableOpacity
       style={styles.modalItem}
       onPress={() => {
@@ -400,6 +529,7 @@ const CreateQuoteScreen = ({ navigation }) => {
   );
 
   const renderVariantItem = ({ item }, itemIndex) => {
+    // ... (Giữ nguyên renderVariantItem)
     const modelName = typeof item.model === "object" ? item.model?.name : "N/A";
     return (
       <TouchableOpacity
@@ -427,6 +557,7 @@ const CreateQuoteScreen = ({ navigation }) => {
   };
 
   const renderColorItem = ({ item }, itemIndex) => (
+    // ... (Giữ nguyên renderColorItem)
     <TouchableOpacity
       style={styles.modalItem}
       onPress={() => {
@@ -613,7 +744,7 @@ const CreateQuoteScreen = ({ navigation }) => {
                   keyboardType="numeric"
                 />
 
-                {/* Unit Price */}
+                {/* Unit Price (Đã bao gồm màu) */}
                 <Input
                   label="Đơn giá *"
                   value={item.unitPrice?.toLocaleString("vi-VN")}
@@ -636,7 +767,7 @@ const CreateQuoteScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Giá và phí</Text>
 
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Tạm tính:</Text>
+            <Text style={styles.priceLabel}>Tạm tính (chưa giảm giá):</Text>
             <Text style={styles.priceValue}>
               {subtotal.toLocaleString("vi-VN")} đ
             </Text>
@@ -662,7 +793,11 @@ const CreateQuoteScreen = ({ navigation }) => {
                           )} đ`
                         : selectedPromotion.discountPercent
                         ? `Giảm ${selectedPromotion.discountPercent}%`
-                        : "Khuyến mãi"}
+                        : selectedPromotion.value
+                        ? `Giảm ${selectedPromotion.value.toLocaleString(
+                            "vi-VN"
+                          )} đ`
+                        : "Đã chọn khuyến mãi"}
                     </Text>
                   </View>
                 ) : (
@@ -696,7 +831,7 @@ const CreateQuoteScreen = ({ navigation }) => {
 
           {promotionTotal > 0 && (
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Khuyến mãi:</Text>
+              <Text style={styles.priceLabel}>Giảm giá Khuyến mãi:</Text>
               <Text
                 style={[styles.priceValue, { color: theme.colors.success }]}
               >
@@ -705,31 +840,38 @@ const CreateQuoteScreen = ({ navigation }) => {
             </View>
           )}
 
-          <Text style={styles.feesLabel}>Phí</Text>
-
           <Input
             label="Phí đăng ký"
-            value={fees.registration?.toString()}
+            value={fees.registration?.toLocaleString("vi-VN")}
             onChangeText={(text) =>
-              setFees({ ...fees, registration: parseInt(text) || 0 })
+              setFees({
+                ...fees,
+                registration: parseInt(text.replace(/\./g, "")) || 0,
+              })
             }
             keyboardType="numeric"
           />
 
           <Input
             label="Phí biển số"
-            value={fees.plate?.toString()}
+            value={fees.plate?.toLocaleString("vi-VN")}
             onChangeText={(text) =>
-              setFees({ ...fees, plate: parseInt(text) || 0 })
+              setFees({
+                ...fees,
+                plate: parseInt(text.replace(/\./g, "")) || 0,
+              })
             }
             keyboardType="numeric"
           />
 
           <Input
             label="Phí giao hàng"
-            value={fees.delivery?.toString()}
+            value={fees.delivery?.toLocaleString("vi-VN")}
             onChangeText={(text) =>
-              setFees({ ...fees, delivery: parseInt(text) || 0 })
+              setFees({
+                ...fees,
+                delivery: parseInt(text.replace(/\./g, "")) || 0,
+              })
             }
             keyboardType="numeric"
           />
@@ -798,6 +940,7 @@ const CreateQuoteScreen = ({ navigation }) => {
         />
       </ScrollView>
 
+      {/* Modals */}
       {/* Customer Modal */}
       <Modal
         visible={customerModalVisible}
@@ -961,283 +1104,7 @@ const CreateQuoteScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing["3xl"],
-  },
-  sectionTitle: {
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.md,
-  },
-  picker: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: theme.colors.backgroundLight,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-  },
-  pickerContent: {
-    flex: 1,
-  },
-  pickerText: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textPrimary,
-  },
-  pickerSubtext: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
-  },
-  pickerPlaceholder: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textTertiary,
-  },
-  pickerDisabled: {
-    color: theme.colors.textTertiary,
-  },
-  pickerContainer: {
-    marginBottom: theme.spacing.md,
-  },
-  pickerLabel: {
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.xs,
-  },
-  itemsHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: theme.spacing.md,
-  },
-  addButton: {
-    padding: theme.spacing.xs,
-  },
-  itemCard: {
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  itemHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: theme.spacing.md,
-  },
-  itemTitle: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.textPrimary,
-  },
-  priceRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: theme.spacing.md,
-  },
-  priceLabel: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
-  },
-  priceValue: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.textPrimary,
-  },
-  feesLabel: {
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.textPrimary,
-    marginTop: theme.spacing.sm,
-    marginBottom: theme.spacing.xs,
-  },
-  totalRow: {
-    paddingTop: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    marginTop: theme.spacing.sm,
-  },
-  totalLabel: {
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.textPrimary,
-  },
-  totalValue: {
-    fontSize: theme.typography.fontSize["2xl"],
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.primary,
-  },
-  textAreaContainer: {
-    marginTop: theme.spacing.sm,
-  },
-  textAreaLabel: {
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.xs,
-  },
-  textArea: {
-    backgroundColor: theme.colors.backgroundLight,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textPrimary,
-    minHeight: 100,
-  },
-  submitButton: {
-    marginTop: theme.spacing.lg,
-  },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: theme.colors.backgroundLight,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    maxHeight: "80%",
-    paddingBottom: theme.spacing.lg,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: theme.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  modalTitle: {
-    fontSize: theme.typography.fontSize.xl,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.textPrimary,
-  },
-  modalItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  modalItemContent: {
-    flex: 1,
-  },
-  modalItemTitle: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.textPrimary,
-  },
-  modalItemSubtitle: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
-  },
-  colorSwatch: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  colorSwatchSmall: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    marginRight: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  colorPickerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  emptyState: {
-    padding: theme.spacing.xl,
-    alignItems: "center",
-  },
-  emptyText: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
-  },
-  clearButton: {
-    padding: theme.spacing.xs,
-    marginRight: theme.spacing.xs,
-  },
-  // Date Picker Styles
-  datePickerModal: {
-    backgroundColor: theme.colors.backgroundLight,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    maxHeight: "70%",
-    paddingBottom: theme.spacing.lg,
-  },
-  datePickerContent: {
-    padding: theme.spacing.md,
-  },
-  datePickerRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  datePickerColumn: {
-    flex: 1,
-    alignItems: "center",
-    marginHorizontal: theme.spacing.xs,
-  },
-  datePickerLabel: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.sm,
-  },
-  datePickerList: {
-    maxHeight: 200,
-    width: "100%",
-  },
-  datePickerItem: {
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    marginVertical: 2,
-    backgroundColor: theme.colors.background,
-    alignItems: "center",
-  },
-  datePickerItemSelected: {
-    backgroundColor: theme.colors.primary,
-  },
-  datePickerItemText: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textPrimary,
-  },
-  datePickerItemTextSelected: {
-    color: theme.colors.textWhite,
-    fontWeight: theme.typography.fontWeight.bold,
-  },
-  datePickerFooter: {
-    padding: theme.spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-
+  // ... (Giữ nguyên StyleSheet)
   container: {
     flex: 1,
     backgroundColor: "#F8FAFC",
@@ -1269,19 +1136,83 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
+  pickerContent: {
+    flex: 1,
+  },
+  pickerText: {
+    fontSize: 16,
+    color: "#1E293B",
+  },
+  pickerSubtext: {
+    fontSize: 14,
+    color: "#64748B",
+    marginTop: 2,
+  },
   pickerPlaceholder: {
     color: "#94A3B8",
+  },
+  pickerDisabled: {
+    color: "#94A3B8",
+  },
+  pickerContainer: {
+    marginBottom: 12,
+  },
+  pickerLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#1E293B",
+    marginBottom: 4,
+  },
+  itemsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
   },
   addButton: {
     backgroundColor: "#E0F2FE",
     padding: 8,
     borderRadius: 10,
   },
+  itemCard: {
+    padding: 16,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  itemHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  itemTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1E293B",
+  },
+  priceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  priceLabel: {
+    fontSize: 16,
+    color: "#64748B",
+  },
+  priceValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1E293B",
+  },
   totalRow: {
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
     marginTop: 10,
-    paddingTop: 8,
+    paddingTop: 12,
   },
   totalLabel: {
     fontSize: 18,
@@ -1293,16 +1224,162 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#1E3A8A",
   },
+  textAreaContainer: {
+    marginTop: 4,
+  },
+  textAreaLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#1E293B",
+    marginBottom: 4,
+  },
+  textArea: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 16,
+    color: "#1E293B",
+    minHeight: 100,
+  },
   submitButton: {
     marginTop: 20,
-    borderRadius: 14,
-    backgroundColor: "#007AFF",
+    borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
-    shadowColor: "#007AFF",
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 3,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#F8FAFC",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+    paddingBottom: 16,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1E293B",
+  },
+  modalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    paddingHorizontal: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  modalItemContent: {
+    flex: 1,
+  },
+  modalItemTitle: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#1E293B",
+  },
+  modalItemSubtitle: {
+    fontSize: 14,
+    color: "#64748B",
+    marginTop: 2,
+  },
+  colorSwatch: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  colorSwatchSmall: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  colorPickerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  emptyState: {
+    padding: 20,
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#64748B",
+  },
+  clearButton: {
+    padding: 4,
+    marginRight: 8,
+  },
+  // Date Picker Styles
+  datePickerModal: {
+    backgroundColor: "#F8FAFC",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "70%",
+    paddingBottom: 16,
+  },
+  datePickerContent: {
+    padding: 12,
+  },
+  datePickerRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  datePickerColumn: {
+    flex: 1,
+    alignItems: "center",
+    marginHorizontal: 4,
+  },
+  datePickerLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1E293B",
+    marginBottom: 8,
+  },
+  datePickerList: {
+    maxHeight: 200,
+    width: "100%",
+  },
+  datePickerItem: {
+    padding: 12,
+    borderRadius: 8,
+    marginVertical: 2,
+    backgroundColor: "#fff",
+    alignItems: "center",
+  },
+  datePickerItemSelected: {
+    backgroundColor: "#3B82F6", // theme.colors.primary
+  },
+  datePickerItemText: {
+    fontSize: 16,
+    color: "#1E293B",
+  },
+  datePickerItemTextSelected: {
+    color: "#FFFFFF", // theme.colors.textWhite
+    fontWeight: "bold",
+  },
+  datePickerFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
   },
 });
 
