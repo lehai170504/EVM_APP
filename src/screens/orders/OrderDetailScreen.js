@@ -6,10 +6,14 @@ import {
   ScrollView,
   Alert,
   TextInput,
+  Platform,
+  TouchableOpacity,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { orderService } from "../../services/orderService";
 import { deliveryService } from "../../services/deliveryService";
+import { paymentService } from "../../services/paymentService";
 import { Card } from "../../components/Card";
 import { Loading } from "../../components/Loading";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -22,15 +26,22 @@ const DeliveryFormSection = ({
   deliveryForm,
   setDeliveryForm,
   handleCreateDelivery,
-  isOrderAllocated,
-  delivery,
 }) => {
-  if (!isOrderAllocated || delivery) return null;
+  const [showPicker, setShowPicker] = useState(false);
+
+  const onChangeDate = (event, selectedDate) => {
+    if (Platform.OS === "android") setShowPicker(false); // đóng picker
+    if (selectedDate) {
+      setDeliveryForm((prev) => ({
+        ...prev,
+        scheduledAt: selectedDate.toISOString(),
+      }));
+    }
+  };
 
   return (
     <Card>
       <Text style={styles.cardTitle}>Tạo giao hàng mới</Text>
-
       <TextInput
         style={styles.textInput}
         placeholder="Địa chỉ giao hàng"
@@ -40,14 +51,30 @@ const DeliveryFormSection = ({
         }
       />
 
-      <TextInput
-        style={styles.textInput}
-        placeholder="Thời gian dự kiến (VD: 2025-12-27T09:00:00Z)"
-        value={deliveryForm.scheduledAt}
-        onChangeText={(text) =>
-          setDeliveryForm((prev) => ({ ...prev, scheduledAt: text }))
-        }
-      />
+      <TouchableOpacity
+        onPress={() => setShowPicker(true)}
+        style={[styles.textInput, { justifyContent: "center" }]}
+      >
+        <Text style={{ color: deliveryForm.scheduledAt ? "#000" : "#999" }}>
+          {deliveryForm.scheduledAt
+            ? format(new Date(deliveryForm.scheduledAt), "dd/MM/yyyy HH:mm")
+            : "Chọn thời gian dự kiến"}
+        </Text>
+      </TouchableOpacity>
+
+      {showPicker && (
+        <DateTimePicker
+          value={
+            deliveryForm.scheduledAt
+              ? new Date(deliveryForm.scheduledAt)
+              : new Date()
+          }
+          mode="datetime"
+          display={Platform.OS === "ios" ? "inline" : "default"}
+          onChange={onChangeDate}
+          minimumDate={new Date()}
+        />
+      )}
 
       <TextInput
         style={styles.textInput}
@@ -57,70 +84,77 @@ const DeliveryFormSection = ({
           setDeliveryForm((prev) => ({ ...prev, notes: text }))
         }
       />
-
       <Button
         title="Tạo giao hàng"
         variant="primary"
         fullWidth
-        onPress={handleCreateDelivery}
         style={{ marginTop: theme.spacing.md }}
+        onPress={handleCreateDelivery}
         disabled={!deliveryForm.address.trim()}
       />
     </Card>
   );
 };
 
-/* ------------------- MÀN HÌNH CHÍNH ------------------- */
+/* ------------------- MAIN SCREEN ------------------- */
 const OrderDetailScreen = ({ route }) => {
   const { orderId } = route.params;
+
   const [order, setOrder] = useState(null);
   const [delivery, setDelivery] = useState(null);
+  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deliveryForm, setDeliveryForm] = useState({
     address: "",
     scheduledAt: "",
     notes: "",
   });
+  const [latestDelivery, setLatestDelivery] = useState(null);
 
-  /* --- LOAD DỮ LIỆU --- */
-  const loadOrderAndDelivery = useCallback(async () => {
+  /* --- LOAD DATA --- */
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [orderData, deliveries] = await Promise.all([
+      const [orderData, deliveries, paymentData] = await Promise.all([
         orderService.getOrderById(orderId),
         deliveryService.getDeliveries(orderId),
+        paymentService.getPayments(orderId),
       ]);
 
       setOrder(orderData);
-      setDelivery(deliveries?.[0] || null);
+      setPayments(paymentData || []);
 
-      // Prefill form từ order (nếu chưa có)
+      // Lấy delivery mới nhất (theo createdAt)
+      const latestDelivery =
+        deliveries?.sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        )[0] || null;
+      setDelivery(latestDelivery);
+
+      // Khởi tạo form
       setDeliveryForm((prev) => ({
         ...prev,
         address: prev.address || orderData.customer?.address || "",
         scheduledAt: prev.scheduledAt || orderData.expectedDelivery || "",
       }));
     } catch (error) {
-      console.error("Load data error:", error);
-      Alert.alert("Lỗi", "Không thể tải chi tiết đơn hàng hoặc giao hàng.");
+      console.error(error);
+      Alert.alert("Lỗi", "Không thể tải dữ liệu đơn hàng.");
     } finally {
       setLoading(false);
     }
   }, [orderId]);
 
   useEffect(() => {
-    loadOrderAndDelivery();
-  }, [loadOrderAndDelivery]);
+    loadData();
+  }, [loadData]);
 
-  /* --- TẠO GIAO HÀNG MỚI --- */
+  /* --- CREATE DELIVERY --- */
   const handleCreateDelivery = async () => {
     if (!order?._id) return;
-
     const { address, scheduledAt, notes } = deliveryForm;
-    if (!address.trim()) {
-      Alert.alert("Thông báo", "Địa chỉ giao hàng là bắt buộc.");
-      return;
-    }
+    if (!address.trim())
+      return Alert.alert("Thông báo", "Địa chỉ giao hàng là bắt buộc.");
 
     const payload = {
       order: order._id,
@@ -128,7 +162,6 @@ const OrderDetailScreen = ({ route }) => {
       scheduledAt: scheduledAt || undefined,
       notes: notes || undefined,
     };
-
     Alert.alert(
       "Xác nhận tạo giao hàng",
       `Địa chỉ: ${payload.address}\nThời gian: ${
@@ -142,16 +175,13 @@ const OrderDetailScreen = ({ route }) => {
             try {
               setLoading(true);
               const newDelivery = await deliveryService.createDelivery(payload);
-              Alert.alert("Thành công", "Đã tạo giao hàng thành công.");
               setDelivery(newDelivery);
-              // Reload lại để sync thông tin mới
-              await loadOrderAndDelivery();
+              Alert.alert("Thành công", "Đã tạo giao hàng thành công.");
+
+              setDeliveryForm({ address: "", scheduledAt: "", notes: "" });
             } catch (error) {
-              console.error("Create delivery error:", error);
-              const msg =
-                error.response?.data?.message ||
-                "Không thể tạo giao hàng. Vui lòng thử lại.";
-              Alert.alert("Lỗi", msg);
+              console.error(error);
+              Alert.alert("Lỗi", "Không thể tạo giao hàng. Vui lòng thử lại.");
             } finally {
               setLoading(false);
             }
@@ -161,19 +191,15 @@ const OrderDetailScreen = ({ route }) => {
     );
   };
 
-  /* --- CẬP NHẬT TRẠNG THÁI GIAO HÀNG --- */
+  /* --- UPDATE DELIVERY STATUS --- */
   const handleUpdateDeliveryStatus = async (newStatus) => {
     if (!delivery) return;
-
     const validTransitions = {
       pending: "in_progress",
       in_progress: "delivered",
     };
-
-    if (validTransitions[delivery.status] !== newStatus) {
-      Alert.alert("Cảnh báo", "Không thể chuyển trạng thái này.");
-      return;
-    }
+    if (validTransitions[delivery.status] !== newStatus)
+      return Alert.alert("Cảnh báo", "Không thể chuyển trạng thái này.");
 
     Alert.alert(
       "Xác nhận cập nhật",
@@ -195,11 +221,8 @@ const OrderDetailScreen = ({ route }) => {
                 `Trạng thái đã được cập nhật: ${newStatus.toUpperCase()}`
               );
             } catch (error) {
-              console.error("Update delivery status error:", error);
-              const msg =
-                error.response?.data?.message ||
-                "Không thể cập nhật trạng thái.";
-              Alert.alert("Lỗi", msg);
+              console.error(error);
+              Alert.alert("Lỗi", "Không thể cập nhật trạng thái.");
             } finally {
               setLoading(false);
             }
@@ -209,9 +232,34 @@ const OrderDetailScreen = ({ route }) => {
     );
   };
 
-  /* --- LOADING --- */
-  if (loading) return <Loading />;
+  /* --- INVOICE ORDER --- */
+  const handleInvoiceOrder = async () => {
+    if (!order?._id) return;
+    Alert.alert("Xác nhận", "Bạn có chắc muốn xuất hóa đơn cho đơn hàng này?", [
+      { text: "Hủy", style: "cancel" },
+      {
+        text: "Xác nhận",
+        onPress: async () => {
+          try {
+            setLoading(true);
+            const updatedOrder = await orderService.updateOrderStatus(
+              order._id,
+              "invoiced"
+            );
+            setOrder(updatedOrder);
+            Alert.alert("Thành công", "Đơn hàng đã được xuất hóa đơn.");
+          } catch (error) {
+            console.error(error);
+            Alert.alert("Lỗi", "Không thể xuất hóa đơn.");
+          } finally {
+            setLoading(false);
+          }
+        },
+      },
+    ]);
+  };
 
+  if (loading) return <Loading />;
   if (!order)
     return (
       <SafeAreaView style={styles.container}>
@@ -221,22 +269,31 @@ const OrderDetailScreen = ({ route }) => {
       </SafeAreaView>
     );
 
-  /* --- EXTRACT DỮ LIỆU --- */
-  const { dealer, customer, items, paymentMethod, deposit, status } = order;
-  const isOrderAllocated = status === "allocated";
-  const totalAmount =
-    order.totalAmount ||
+  const {
+    dealer,
+    customer,
+    items,
+    paymentMethod,
+    deposit,
+    status,
+    totalAmount,
+    expectedDelivery,
+    createdAt,
+    orderNo,
+  } = order;
+  const total =
+    totalAmount ||
     items?.reduce(
       (sum, i) => sum + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0),
       0
     ) ||
     0;
-
-  const expectedDeliveryDate = order.expectedDelivery
-    ? format(new Date(order.expectedDelivery), "dd/MM/yyyy HH:mm")
+  const expectedDeliveryDate = expectedDelivery
+    ? format(new Date(expectedDelivery), "dd/MM/yyyy HH:mm")
     : "Chưa xác định";
+  const showDeliveryForm = status === "allocated";
+  const canInvoiceOrder = status === "allocated";
 
-  /* --- RENDER --- */
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <ScrollView
@@ -247,10 +304,20 @@ const OrderDetailScreen = ({ route }) => {
         <Card>
           <View style={styles.header}>
             <Text style={styles.title}>
-              Đơn hàng #{order.orderNo || order._id?.slice(-6)}
+              Đơn hàng #{orderNo || order._id?.slice(-6)}
             </Text>
             <StatusBadge status={status} />
           </View>
+
+          {canInvoiceOrder && (
+            <Button
+              title="Xuất hóa đơn"
+              variant="primary"
+              fullWidth
+              style={{ marginBottom: theme.spacing.md }}
+              onPress={handleInvoiceOrder}
+            />
+          )}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Khách hàng</Text>
@@ -269,7 +336,7 @@ const OrderDetailScreen = ({ route }) => {
             <View style={styles.colHalf}>
               <Text style={styles.sectionTitle}>Ngày tạo</Text>
               <Text style={styles.sectionValue}>
-                {format(new Date(order.createdAt), "dd/MM/yyyy HH:mm")}
+                {format(new Date(createdAt), "dd/MM/yyyy HH:mm")}
               </Text>
             </View>
             <View style={styles.colHalf}>
@@ -282,15 +349,15 @@ const OrderDetailScreen = ({ route }) => {
         {/* CHI TIẾT SẢN PHẨM */}
         <Card>
           <Text style={styles.cardTitle}>Chi tiết sản phẩm</Text>
-          {items?.map((item, index) => {
+          {items?.map((item, idx) => {
             const subtotal =
               (Number(item.unitPrice) || 0) * (Number(item.qty) || 0);
             return (
               <View
-                key={index}
+                key={idx}
                 style={[
                   styles.itemRow,
-                  index === items.length - 1 && styles.lastItemRow,
+                  idx === items.length - 1 && styles.lastItemRow,
                 ]}
               >
                 <View style={styles.itemInfo}>
@@ -301,7 +368,8 @@ const OrderDetailScreen = ({ route }) => {
                     <Text style={styles.itemColor}>Màu: {item.color.name}</Text>
                   )}
                   <Text style={styles.itemQty}>
-                    {item.unitPrice?.toLocaleString("vi-VN")} đ x {item.qty}
+                    {(item.unitPrice || 0).toLocaleString("vi-VN")} đ x{" "}
+                    {item.qty}
                   </Text>
                 </View>
                 <Text style={styles.itemPrice}>
@@ -318,19 +386,25 @@ const OrderDetailScreen = ({ route }) => {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Tổng cộng:</Text>
             <Text style={styles.summaryValue}>
-              {totalAmount.toLocaleString("vi-VN")} đ
+              {total.toLocaleString("vi-VN")} đ
             </Text>
           </View>
-
           {deposit > 0 && (
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Đặt cọc:</Text>
-              <Text style={styles.summaryValue}>
+              <Text style={[styles.summaryValue, { color: "#FF9500" }]}>
                 {deposit.toLocaleString("vi-VN")} đ
               </Text>
             </View>
           )}
-
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Còn phải thanh toán:</Text>
+            <Text
+              style={[styles.summaryValue, { color: theme.colors.primary }]}
+            >
+              {(total - deposit).toLocaleString("vi-VN")} đ
+            </Text>
+          </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Phương thức thanh toán:</Text>
             <Text style={styles.summaryValue}>
@@ -339,16 +413,16 @@ const OrderDetailScreen = ({ route }) => {
           </View>
         </Card>
 
-        {/* FORM TẠO DELIVERY */}
-        <DeliveryFormSection
-          deliveryForm={deliveryForm}
-          setDeliveryForm={setDeliveryForm}
-          handleCreateDelivery={handleCreateDelivery}
-          isOrderAllocated={isOrderAllocated}
-          delivery={delivery}
-        />
+        {/* FORM GIAO HÀNG */}
+        {showDeliveryForm && (
+          <DeliveryFormSection
+            deliveryForm={deliveryForm}
+            setDeliveryForm={setDeliveryForm}
+            handleCreateDelivery={handleCreateDelivery}
+          />
+        )}
 
-        {/* NÚT CẬP NHẬT TRẠNG THÁI GIAO HÀNG */}
+        {/* NÚT CẬP NHẬT TRẠNG THÁI DELIVERY */}
         {delivery && (
           <Card>
             <Text style={styles.cardTitle}>Trạng thái giao hàng</Text>
@@ -458,7 +532,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   summaryLabel: {
-    fontSize: theme.typography.fontSize.base,
+    fontSize: theme.typography.base,
     color: theme.colors.textSecondary,
   },
   summaryValue: {

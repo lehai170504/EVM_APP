@@ -67,6 +67,9 @@ const OrdersScreen = () => {
       }, 0) ||
       0;
 
+    const deposit = item.deposit || 0;
+    const finalAmount = calculatedTotalAmount - deposit;
+
     const scaleAnim = new Animated.Value(1);
     const handlePressIn = () =>
       Animated.spring(scaleAnim, {
@@ -111,16 +114,30 @@ const OrdersScreen = () => {
                 <Text style={styles.detailLabel}>Số lượng:</Text>
                 <Text style={styles.detailValue}>{totalQuantity}</Text>
               </View>
+
               <View style={styles.detailRow}>
                 <Ionicons
-                  name="cash-outline"
+                  name="wallet-outline"
                   size={16}
-                  color={theme.colors.success}
+                  color="#FF9500" // màu cam nổi bật
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={styles.detailLabel}>Tiền đặt cọc:</Text>
+                <Text style={[styles.totalValue, { color: "#FF9500" }]}>
+                  {deposit.toLocaleString("vi-VN")} đ
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Ionicons
+                  name="card-outline"
+                  size={16}
+                  color={theme.colors.primary}
                   style={{ marginRight: 6 }}
                 />
                 <Text style={styles.detailLabel}>Tổng thanh toán:</Text>
                 <Text style={styles.totalValue}>
-                  {calculatedTotalAmount.toLocaleString("vi-VN")} đ
+                  {finalAmount.toLocaleString("vi-VN")} đ
                 </Text>
               </View>
             </View>

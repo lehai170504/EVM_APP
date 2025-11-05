@@ -10,12 +10,14 @@ import {
   Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
+
 import { Loading } from "../components/Loading";
 import { theme } from "../theme";
 import { dashboardService } from "../services/dashboardService";
 import { orderService } from "../services/orderService";
-import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -32,29 +34,29 @@ const DashboardScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
   const { user } = useAuth();
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const carouselRef = useRef(null);
-  const currentIndex = useRef(ITEM_COUNT); // Start at middle
+  const currentIndex = useRef(ITEM_COUNT);
 
   useEffect(() => {
     loadDashboard();
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 600,
+      duration: 700,
       useNativeDriver: true,
     }).start();
   }, []);
 
   const loadDashboard = async () => {
     try {
-      // Load personal stats và recent orders
       const [statsData, ordersData] = await Promise.all([
         dashboardService.getPersonalStats(),
         orderService.getOrders(),
       ]);
 
       setStats(statsData);
-      // Lấy 5 orders gần nhất (đã sorted by createdAt DESC từ backend)
+
       const sortedOrders = Array.isArray(ordersData)
         ? ordersData.sort(
             (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
@@ -74,18 +76,13 @@ const DashboardScreen = () => {
     loadDashboard();
   };
 
-  if (loading) {
-    return <Loading />;
-  }
+  if (loading) return <Loading />;
 
-  const summary = stats?.summary || {};
   const personalStats = stats?.summary || {};
   const totalRevenue = personalStats.totalRevenue || 0;
   const totalOrders = personalStats.totalOrders || 0;
   const averageOrderValue = personalStats.averageOrderValue || 0;
   const ordersByStatus = personalStats.ordersByStatus || {};
-
-  // Tính pending orders từ ordersByStatus
   const pendingOrders = ordersByStatus.new || ordersByStatus.confirmed || 0;
   const deliveredOrders = ordersByStatus.delivered || 0;
 
@@ -114,26 +111,28 @@ const DashboardScreen = () => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl
-            refreshing={Boolean(refreshing)}
-            onRefresh={onRefresh}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header - Title và Avatar */}
+        {/* Header */}
         <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
           <View style={styles.headerTop}>
             <Text style={styles.headerTitle}>Tổng quan</Text>
             <TouchableOpacity
               style={styles.avatarContainer}
               onPress={() => navigation.navigate("Settings")}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
             >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{getInitials(userName)}</Text>
-              </View>
-              <View style={styles.onlineIndicator} />
+              <LinearGradient
+                colors={["#8e44ad", "#3498db"]}
+                style={styles.avatarGradient}
+              >
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{getInitials(userName)}</Text>
+                </View>
+                <View style={styles.onlineIndicator} />
+              </LinearGradient>
             </TouchableOpacity>
           </View>
           <View style={styles.headerUserInfo}>
@@ -143,22 +142,24 @@ const DashboardScreen = () => {
             </Text>
           </View>
         </Animated.View>
-        {/* Compact Revenue Card */}
+
+        {/* Revenue Card */}
         <Animated.View style={[styles.revenueCard, { opacity: fadeAnim }]}>
-          <View style={styles.revenueCardGradient}>
+          <LinearGradient
+            colors={["#6a11cb", "#2575fc"]}
+            style={styles.revenueCardGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
             <View style={styles.revenueHeader}>
               <View style={styles.revenueLeft}>
                 <Text style={styles.revenueLabel}>Monthly Revenue</Text>
-                <Text style={styles.revenueAmount} numberOfLines={1}>
+                <Text style={styles.revenueAmount}>
                   {totalRevenue.toLocaleString("vi-VN")} đ
                 </Text>
               </View>
               <View style={styles.revenueIcon}>
-                <Ionicons
-                  name="trending-up"
-                  size={20}
-                  color={theme.colors.textWhite}
-                />
+                <Ionicons name="trending-up" size={24} color="#fff" />
               </View>
             </View>
             <View style={styles.revenueStats}>
@@ -169,14 +170,15 @@ const DashboardScreen = () => {
               <View style={styles.revenueStatDivider} />
               <View style={styles.revenueStatItem}>
                 <Text style={styles.revenueStatLabel}>Avg</Text>
-                <Text style={styles.revenueStatValue} numberOfLines={1}>
+                <Text style={styles.revenueStatValue}>
                   {averageOrderValue.toLocaleString("vi-VN")} đ
                 </Text>
               </View>
             </View>
-          </View>
+          </LinearGradient>
         </Animated.View>
-        {/* Stats Carousel - Infinite Loop, Center Snapping */}
+
+        {/* Stats Carousel */}
         <View style={styles.statsCarouselContainer}>
           <ScrollView
             ref={carouselRef}
@@ -184,7 +186,6 @@ const DashboardScreen = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.statsCarousel}
             snapToInterval={CARD_WRAPPER_WIDTH}
-            snapToAlignment="center"
             decelerationRate="fast"
             pagingEnabled={false}
             onMomentumScrollEnd={(e) => {
@@ -192,18 +193,7 @@ const DashboardScreen = () => {
               const index = Math.round(offsetX / CARD_WRAPPER_WIDTH);
               currentIndex.current = index;
 
-              // Infinite loop: if at start, jump to middle
-              if (index === 0) {
-                setTimeout(() => {
-                  currentIndex.current = ITEM_COUNT;
-                  carouselRef.current?.scrollTo({
-                    x: ITEM_COUNT * CARD_WRAPPER_WIDTH,
-                    animated: false,
-                  });
-                }, 50);
-              }
-              // Infinite loop: if at end, jump to middle
-              else if (index >= ITEM_COUNT * 2) {
+              if (index === 0 || index >= ITEM_COUNT * 2) {
                 setTimeout(() => {
                   currentIndex.current = ITEM_COUNT;
                   carouselRef.current?.scrollTo({
@@ -214,7 +204,6 @@ const DashboardScreen = () => {
               }
             }}
             onContentSizeChange={() => {
-              // Start at middle position for infinite scroll
               currentIndex.current = ITEM_COUNT;
               carouselRef.current?.scrollTo({
                 x: ITEM_COUNT * CARD_WRAPPER_WIDTH,
@@ -222,7 +211,6 @@ const DashboardScreen = () => {
               });
             }}
           >
-            {/* Duplicate cards for infinite loop */}
             {[...Array(ITEM_COUNT * 3)].map((_, index) => {
               const realIndex = index % ITEM_COUNT;
               let icon, label, value, color, delay;
@@ -261,6 +249,7 @@ const DashboardScreen = () => {
             })}
           </ScrollView>
         </View>
+
         {/* Recent Orders */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -317,39 +306,35 @@ const DashboardScreen = () => {
             </View>
           )}
         </View>
+
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActionsGrid}>
-            {/* QUICK ACTION: Lịch lái thử (Mới) */}
             <QuickActionButton
               icon="calendar-outline"
               label="Lịch lái thử"
-              color={theme.colors.tertiary || "#8e44ad"} // Màu Tím
+              color={theme.colors.tertiary}
               onPress={() => navigation.navigate("TestDrives")}
             />
-            {/* QUICK ACTION: Danh sách xe điện */}
             <QuickActionButton
               icon="add-circle"
               label="Danh sách xe điện"
               color={theme.colors.primary}
               onPress={() => navigation.navigate("Products")}
             />
-            {/* QUICK ACTION: New Order */}
             <QuickActionButton
               icon="cart"
               label="New Order"
               color={theme.colors.accent}
               onPress={() => navigation.navigate("CreateOrder")}
             />
-            {/* QUICK ACTION: Quotes */}
             <QuickActionButton
               icon="document-text"
               label="Quotes"
               color={theme.colors.secondary}
               onPress={() => navigation.navigate("Quotes")}
             />
-            {/* QUICK ACTION: Customers */}
             <QuickActionButton
               icon="people"
               label="Customers"
@@ -363,10 +348,9 @@ const DashboardScreen = () => {
   );
 };
 
-// Stat Card Component
+// ---------------- Stat Card ----------------
 const StatCard = ({ icon, label, value, color, delay }) => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     Animated.spring(scaleAnim, {
       toValue: 1,
@@ -382,19 +366,17 @@ const StatCard = ({ icon, label, value, color, delay }) => {
       style={[styles.statCard, { transform: [{ scale: scaleAnim }] }]}
     >
       <View
-        style={[styles.statIconContainer, { backgroundColor: color + "15" }]}
+        style={[styles.statIconContainer, { backgroundColor: color + "20" }]}
       >
-        <Ionicons name={icon} size={24} color={color} />
+        <Ionicons name={icon} size={28} color={color} />
       </View>
-      <Text style={styles.statValue}>
-        {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
-      </Text>
+      <Text style={styles.statValue}>{value.toLocaleString("vi-VN")}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </Animated.View>
   );
 };
 
-// Order Card Component
+// ---------------- Order Card ----------------
 const OrderCard = ({ order, navigation, index }) => {
   const slideAnim = useRef(new Animated.Value(50)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -428,38 +410,30 @@ const OrderCard = ({ order, navigation, index }) => {
     return statusColors[status?.toLowerCase()] || theme.colors.textSecondary;
   };
 
-  // Lấy customer name từ API
   const customerName =
     order.customer?.fullName || order.customer?.email || "N/A";
-
-  // Lấy vehicle info từ items
   const firstItem = order.items?.[0];
   const vehicleModel =
     firstItem?.variant?.trim || firstItem?.variant?.model?.name || "N/A";
-
-  // Tính total từ items
   const total =
-    order.items?.reduce((sum, item) => {
-      return sum + (item.unitPrice || 0) * (item.qty || 0);
-    }, 0) ||
+    order.items?.reduce(
+      (sum, item) => sum + (item.unitPrice || 0) * (item.qty || 0),
+      0
+    ) ||
     order.total ||
     0;
-
   const status = order.status || "new";
 
   return (
     <Animated.View
-      style={{
-        transform: [{ translateX: slideAnim }],
-        opacity: opacityAnim,
-      }}
+      style={{ transform: [{ translateX: slideAnim }], opacity: opacityAnim }}
     >
       <TouchableOpacity
         style={styles.orderCard}
         onPress={() =>
           navigation.navigate("OrderDetail", { orderId: order._id })
         }
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
         <View style={styles.orderLeft}>
           <View
@@ -475,12 +449,8 @@ const OrderCard = ({ order, navigation, index }) => {
             />
           </View>
           <View style={styles.orderInfo}>
-            <Text style={styles.orderCustomer} numberOfLines={1}>
-              {customerName}
-            </Text>
-            <Text style={styles.orderVehicle} numberOfLines={1}>
-              {vehicleModel}
-            </Text>
+            <Text style={styles.orderCustomer}>{customerName}</Text>
+            <Text style={styles.orderVehicle}>{vehicleModel}</Text>
           </View>
         </View>
         <View style={styles.orderRight}>
@@ -505,35 +475,29 @@ const OrderCard = ({ order, navigation, index }) => {
   );
 };
 
-// Quick Action Button
+// ---------------- Quick Action ----------------
 const QuickActionButton = ({ icon, label, color, onPress }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const handlePressIn = () => {
+  const handlePressIn = () =>
     Animated.spring(scaleAnim, {
       toValue: 0.92,
       useNativeDriver: true,
     }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-    }).start();
-  };
+  const handlePressOut = () =>
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
         style={styles.quickAction}
         onPress={onPress}
+        activeOpacity={0.8}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        activeOpacity={0.9}
       >
         <View
-          style={[styles.quickActionIcon, { backgroundColor: color + "15" }]}
+          style={[styles.quickActionIcon, { backgroundColor: color + "20" }]}
         >
           <Ionicons name={icon} size={28} color={color} />
         </View>
@@ -544,63 +508,36 @@ const QuickActionButton = ({ icon, label, color, onPress }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 100,
-  },
-  header: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.md,
-  },
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 80 },
+  header: { paddingHorizontal: 16, marginBottom: 24 },
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: theme.spacing.md,
   },
   headerTitle: {
-    fontSize: theme.typography.fontSize["2xl"],
-    fontWeight: theme.typography.fontWeight.bold,
+    fontSize: 24,
+    fontWeight: "700",
     color: theme.colors.textPrimary,
   },
-  headerUserInfo: {
-    marginTop: theme.spacing.xs,
-  },
-  greetingText: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.textSecondary,
-    fontWeight: theme.typography.fontWeight.medium,
-    marginBottom: 2,
-  },
-  userNameText: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.textPrimary,
-  },
-  avatarContainer: {
-    position: "relative",
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.colors.primary,
+  avatarContainer: {},
+  avatarGradient: {
+    borderRadius: 24,
+    padding: 2,
     justifyContent: "center",
     alignItems: "center",
-    ...theme.shadow.sm,
   },
-  avatarText: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.textWhite,
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: theme.colors.background,
+    justifyContent: "center",
+    alignItems: "center",
   },
+  avatarText: { color: "#fff", fontWeight: "700" },
   onlineIndicator: {
     position: "absolute",
     bottom: 0,
@@ -608,280 +545,177 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: theme.colors.success,
+    backgroundColor: "#4cd137",
     borderWidth: 2,
-    borderColor: theme.colors.background,
+    borderColor: "#fff",
+  },
+  headerUserInfo: { marginTop: 12 },
+  greetingText: { color: theme.colors.textSecondary, fontSize: 14 },
+  userNameText: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: theme.colors.textPrimary,
   },
   revenueCard: {
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
+    marginHorizontal: 16,
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 24,
   },
-  revenueCardGradient: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.lg,
-    ...theme.shadow.md,
-  },
+  revenueCardGradient: { padding: 20, borderRadius: 16 },
   revenueHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: theme.spacing.md,
-  },
-  revenueLeft: {
-    flex: 1,
-    marginRight: theme.spacing.md,
-  },
-  revenueLabel: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.textWhite + "DD",
-    fontWeight: theme.typography.fontWeight.medium,
-    marginBottom: theme.spacing.xs / 2,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  revenueAmount: {
-    fontSize: 24,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.textWhite,
-    fontFamily: theme.typography.fontFamily.bold,
-  },
-  revenueIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.textWhite + "20",
-    justifyContent: "center",
     alignItems: "center",
+    marginBottom: 16,
   },
+  revenueLeft: {},
+  revenueLabel: { color: "#fff", fontSize: 14 },
+  revenueAmount: { color: "#fff", fontSize: 28, fontWeight: "700" },
+  revenueIcon: { backgroundColor: "#ffffff30", padding: 12, borderRadius: 12 },
   revenueStats: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    paddingTop: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.textWhite + "20",
-  },
-  revenueStatItem: {
     alignItems: "center",
-    flex: 1,
+    justifyContent: "space-between",
   },
-  revenueStatLabel: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.textWhite + "CC",
-    marginBottom: 4,
-  },
-  revenueStatValue: {
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.textWhite,
-  },
-  revenueStatDivider: {
-    width: 1,
-    backgroundColor: theme.colors.textWhite + "30",
-  },
-  statsCarouselContainer: {
-    marginBottom: theme.spacing.lg,
-  },
-  statsCarousel: {
-    paddingLeft: PADDING_HORIZONTAL,
-    paddingRight: PADDING_HORIZONTAL,
-    gap: CARD_GAP,
-    alignItems: "center",
-  },
-  statCardWrapper: {
-    width: CARD_WRAPPER_WIDTH,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  revenueStatItem: { flex: 1, alignItems: "center" },
+  revenueStatLabel: { color: "#fff", fontSize: 12 },
+  revenueStatValue: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  revenueStatDivider: { width: 1, height: 36, backgroundColor: "#ffffff50" },
+  statsCarouselContainer: { marginBottom: 24 },
+  statsCarousel: { paddingHorizontal: PADDING_HORIZONTAL },
+  statCardWrapper: { width: CARD_WRAPPER_WIDTH, alignItems: "center" },
   statCard: {
     width: CARD_WIDTH,
-    backgroundColor: theme.colors.backgroundLight,
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.lg,
+    borderRadius: 16,
+    padding: 20,
+    backgroundColor: "#fff",
     alignItems: "center",
-    ...theme.shadow.card,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
   },
   statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: theme.spacing.sm,
+    marginBottom: 12,
   },
   statValue: {
-    fontSize: theme.typography.fontSize.xl,
-    fontWeight: theme.typography.fontWeight.bold,
+    fontSize: 20,
+    fontWeight: "700",
     color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.xs / 2,
+    marginBottom: 4,
   },
-  statLabel: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.textSecondary,
-    fontWeight: theme.typography.fontWeight.medium,
-    textAlign: "center",
-  },
-  section: {
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-  },
+  statLabel: { fontSize: 14, color: theme.colors.textSecondary },
+  section: { marginBottom: 24, paddingHorizontal: 16 },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: theme.spacing.lg,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: theme.typography.fontSize["2xl"],
-    fontWeight: theme.typography.fontWeight.bold,
+    fontSize: 18,
+    fontWeight: "700",
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.bold,
   },
-  sectionSubtitle: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
-  },
-  seeAllButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.sm,
-    backgroundColor: theme.colors.primary + "10",
-    borderRadius: theme.borderRadius.md,
-  },
+  sectionSubtitle: { fontSize: 12, color: theme.colors.textSecondary },
+  seeAllButton: { flexDirection: "row", alignItems: "center" },
   seeAllText: {
-    fontSize: theme.typography.fontSize.sm,
     color: theme.colors.primary,
-    fontWeight: theme.typography.fontWeight.semibold,
+    fontWeight: "600",
     marginRight: 4,
   },
-  ordersContainer: {
-    gap: theme.spacing.sm,
-  },
+  ordersContainer: { gap: 12 },
   orderCard: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: theme.colors.backgroundLight,
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.lg,
-    ...theme.shadow.card,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
-  orderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    marginRight: theme.spacing.md,
-  },
+  orderLeft: { flexDirection: "row", alignItems: "center" },
   orderIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: theme.spacing.md,
+    marginRight: 12,
   },
-  orderInfo: {
-    flex: 1,
-  },
-  orderCustomer: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.textPrimary,
-    marginBottom: 4,
-  },
-  orderVehicle: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
-  },
-  orderRight: {
-    alignItems: "flex-end",
-  },
-  orderAmount: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.primary,
-    marginBottom: theme.spacing.xs,
-  },
+  orderInfo: {},
+  orderCustomer: { fontWeight: "600", color: theme.colors.textPrimary },
+  orderVehicle: { fontSize: 12, color: theme.colors.textSecondary },
+  orderRight: { alignItems: "flex-end" },
+  orderAmount: { fontWeight: "600", color: theme.colors.textPrimary },
   statusPill: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.sm,
+    borderRadius: 12,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    marginTop: 4,
   },
-  statusPillText: {
-    fontSize: theme.typography.fontSize.xs,
-    fontWeight: theme.typography.fontWeight.semibold,
-    textTransform: "capitalize",
-  },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: theme.spacing["4xl"],
-    backgroundColor: theme.colors.backgroundLight,
-    borderRadius: theme.borderRadius.xl,
-    marginTop: theme.spacing.sm,
-  },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: theme.colors.background,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: theme.spacing.lg,
-  },
+  statusPillText: { fontSize: 12, fontWeight: "600" },
+  emptyState: { alignItems: "center", paddingVertical: 32 },
+  emptyIcon: { marginBottom: 12 },
   emptyTitle: {
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.xs,
+    fontSize: 18,
+    fontWeight: "700",
+    color: theme.colors.textSecondary,
   },
   emptySubtitle: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.xl,
+    fontSize: 14,
+    color: theme.colors.textTertiary,
+    marginBottom: 16,
   },
   emptyButton: {
     backgroundColor: theme.colors.primary,
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.lg,
-    ...theme.shadow.sm,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
-  emptyButtonText: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.textWhite,
-  },
+  emptyButtonText: { color: "#fff", fontWeight: "700" },
   quickActionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.md,
+    justifyContent: "space-between",
+    gap: 12,
   },
   quickAction: {
     flex: 1,
     minWidth: "45%",
-    backgroundColor: theme.colors.backgroundLight,
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.lg,
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: "#fff",
     alignItems: "center",
-    ...theme.shadow.card,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
   quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: theme.spacing.md,
+    marginBottom: 12,
   },
   quickActionLabel: {
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.textPrimary,
+    fontWeight: "600",
     textAlign: "center",
+    color: theme.colors.textPrimary,
   },
 });
 

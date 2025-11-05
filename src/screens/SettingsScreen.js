@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,18 +9,20 @@ import {
   Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+
 import { useAuth } from "../context/AuthContext";
 import { Card } from "../components/Card";
 import { Input } from "../components/Input";
 import { Button } from "../components/Button";
 import { theme } from "../theme";
-import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
 import { authService } from "../services/authService";
 
 const SettingsScreen = () => {
   const { user, logout, updateUser } = useAuth();
   const navigation = useNavigation();
+
   const [profile, setProfile] = useState({
     name: user?.profile?.name || "",
     phone: user?.profile?.phone || "",
@@ -31,8 +33,9 @@ const SettingsScreen = () => {
     confirmPassword: "",
   });
   const [loading, setLoading] = useState(false);
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
-  const slideAnim = React.useRef(new Animated.Value(20)).current;
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -81,12 +84,10 @@ const SettingsScreen = () => {
       alert("Vui lòng nhập đầy đủ thông tin");
       return;
     }
-
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       alert("Mật khẩu mới không khớp");
       return;
     }
-
     setLoading(true);
     try {
       await authService.changePassword(
@@ -117,10 +118,7 @@ const SettingsScreen = () => {
         style: "destructive",
         onPress: async () => {
           await logout();
-          navigation.reset({
-            index: 0,
-            routes: [{ name: "Login" }],
-          });
+          navigation.reset({ index: 0, routes: [{ name: "Login" }] });
         },
       },
     ]);
@@ -133,16 +131,13 @@ const SettingsScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile Header */}
+        {/* Profile Card */}
         <Animated.View
-          style={{
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          }}
+          style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
         >
           <Card style={styles.profileCard}>
             <View style={styles.profileHeader}>
-              <View style={styles.avatarContainer}>
+              <View style={styles.avatarWrapper}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{getInitials(userName)}</Text>
                 </View>
@@ -166,20 +161,11 @@ const SettingsScreen = () => {
           </Card>
         </Animated.View>
 
-        {/* Account Settings Section */}
+        {/* Account Info */}
         <Animated.View
-          style={[
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-          ]}
+          style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
         >
-          <View style={styles.sectionHeader}>
-            <Ionicons
-              name="person-circle-outline"
-              size={20}
-              color={theme.colors.primary}
-            />
-            <Text style={styles.sectionTitle}>Thông tin tài khoản</Text>
-          </View>
+          <Text style={styles.sectionTitle}>Thông tin tài khoản</Text>
           <Card style={styles.sectionCard}>
             <Input
               label="Họ và tên"
@@ -205,20 +191,11 @@ const SettingsScreen = () => {
           </Card>
         </Animated.View>
 
-        {/* Security Section */}
+        {/* Security */}
         <Animated.View
-          style={[
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-          ]}
+          style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
         >
-          <View style={styles.sectionHeader}>
-            <Ionicons
-              name="lock-closed-outline"
-              size={20}
-              color={theme.colors.primary}
-            />
-            <Text style={styles.sectionTitle}>Bảo mật</Text>
-          </View>
+          <Text style={styles.sectionTitle}>Bảo mật</Text>
           <Card style={styles.sectionCard}>
             <Input
               label="Mật khẩu hiện tại"
@@ -258,19 +235,17 @@ const SettingsScreen = () => {
           </Card>
         </Animated.View>
 
-        {/* Logout Section */}
+        {/* Logout */}
         <Animated.View
-          style={[
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-          ]}
+          style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
         >
           <TouchableOpacity
             style={styles.logoutCard}
             onPress={handleLogout}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
           >
             <View style={styles.logoutContent}>
-              <View style={styles.logoutIconContainer}>
+              <View style={styles.logoutIcon}>
                 <Ionicons
                   name="log-out-outline"
                   size={24}
@@ -296,29 +271,16 @@ const SettingsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  scrollView: { flex: 1 },
   scrollContent: {
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing["3xl"],
   },
-  // Profile Section
-  profileCard: {
-    marginBottom: theme.spacing.xl,
-  },
-  profileHeader: {
-    alignItems: "center",
-    paddingVertical: theme.spacing.xl,
-  },
-  avatarContainer: {
-    position: "relative",
-    marginBottom: theme.spacing.md,
-  },
+
+  profileCard: { marginBottom: theme.spacing.xl },
+  profileHeader: { alignItems: "center", paddingVertical: theme.spacing.xl },
+  avatarWrapper: { position: "relative", marginBottom: theme.spacing.md },
   avatar: {
     width: 100,
     height: 100,
@@ -328,11 +290,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     ...theme.shadow.md,
   },
-  avatarText: {
-    fontSize: theme.typography.fontSize["2xl"],
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.textWhite,
-  },
+  avatarText: { fontSize: 28, fontWeight: "700", color: "#fff" },
   onlineIndicator: {
     position: "absolute",
     bottom: 4,
@@ -345,56 +303,40 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.background,
   },
   profileName: {
-    fontSize: theme.typography.fontSize["2xl"],
-    fontWeight: theme.typography.fontWeight.bold,
+    fontSize: 22,
+    fontWeight: "700",
     color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.xs / 2,
+    marginBottom: 4,
   },
   profileEmail: {
-    fontSize: theme.typography.fontSize.base,
+    fontSize: 14,
     color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.sm,
+    marginBottom: 8,
   },
   roleBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.primary + "15",
+    backgroundColor: theme.colors.primary + "20",
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
+    paddingVertical: theme.spacing.xs / 2,
     borderRadius: theme.borderRadius.full,
     gap: theme.spacing.xs / 2,
   },
-  roleText: {
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.primary,
-  },
-  // Section Styles
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
-    marginTop: theme.spacing.lg,
-  },
+  roleText: { fontSize: 12, fontWeight: "500", color: theme.colors.primary },
+
   sectionTitle: {
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.bold,
+    fontSize: 18,
+    fontWeight: "700",
     color: theme.colors.textPrimary,
+    marginBottom: 8,
   },
-  sectionCard: {
-    marginBottom: theme.spacing.md,
-  },
-  saveButton: {
-    marginTop: theme.spacing.md,
-  },
-  // Logout Section
+  sectionCard: { marginBottom: theme.spacing.md },
+  saveButton: { marginTop: theme.spacing.md },
+
   logoutCard: {
     backgroundColor: theme.colors.backgroundLight,
     borderRadius: theme.borderRadius.xl,
-    marginTop: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-    overflow: "hidden",
+    marginVertical: theme.spacing.md,
     ...theme.shadow.card,
   },
   logoutContent: {
@@ -403,7 +345,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     gap: theme.spacing.md,
   },
-  logoutIconContainer: {
+  logoutIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -413,19 +355,13 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     flex: 1,
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.semibold,
+    fontSize: 16,
+    fontWeight: "600",
     color: theme.colors.error,
   },
-  // Footer
-  footer: {
-    alignItems: "center",
-    paddingVertical: theme.spacing.xl,
-  },
-  footerText: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.textTertiary,
-  },
+
+  footer: { alignItems: "center", paddingVertical: theme.spacing.xl },
+  footerText: { fontSize: 12, color: theme.colors.textTertiary },
 });
 
 export default SettingsScreen;

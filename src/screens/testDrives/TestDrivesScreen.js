@@ -6,16 +6,17 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  TextInput,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { testDriveService } from "../../services/testDrivesService";
 import { Card } from "../../components/Card";
 import { Loading } from "../../components/Loading";
 import { Button } from "../../components/Button";
-import { Input } from "../../components/Input";
-import { theme } from "../../theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { theme } from "../../theme";
 
 const TestDrivesScreen = () => {
   const [testDrives, setTestDrives] = useState([]);
@@ -23,6 +24,13 @@ const TestDrivesScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [openFeedbackModal, setOpenFeedbackModal] = useState(false);
+  const [selectedTestDrive, setSelectedTestDrive] = useState(null);
+  const [feedbackData, setFeedbackData] = useState({
+    feedback: "",
+    interestRate: 0,
+  });
+
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -36,8 +44,7 @@ const TestDrivesScreen = () => {
           t.customer?.fullName
             ?.toLowerCase()
             .includes(searchQuery.toLowerCase()) ||
-          t.customer?.phone?.includes(searchQuery) ||
-          t.dealer?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+          t.customer?.phone?.includes(searchQuery)
       );
       setFilteredTestDrives(filtered);
     } else {
@@ -47,7 +54,7 @@ const TestDrivesScreen = () => {
 
   const loadTestDrives = async () => {
     try {
-      const data = await testDriveService.getAll();
+      const data = await testDriveService.getTestDrives();
       setTestDrives(data);
       setFilteredTestDrives(data);
     } catch (error) {
@@ -63,84 +70,91 @@ const TestDrivesScreen = () => {
     loadTestDrives();
   };
 
-  const renderTestDrive = ({ item }) => {
-    return (
-      <TouchableOpacity
-        onPress={() =>
-          navigation.navigate("TestDriveDetail", { testDriveId: item._id })
-        }
-      >
-        <Card style={styles.card}>
-          <View style={styles.rowBetween}>
-            <View style={styles.infoContainer}>
-              <Text style={styles.customerName}>
-                {item.customer?.fullName || "Không rõ tên"}
-              </Text>
-              <Text style={styles.customerPhone}>{item.customer?.phone}</Text>
-              <Text style={styles.dealerText}>
-                Đại lý: {item.dealer?.name || "Không rõ"}
-              </Text>
-              <Text style={styles.variantText}>
-                Phiên bản: {item.variant?.trim || "N/A"}
-              </Text>
-              <Text style={styles.timeText}>
-                Thời gian:{" "}
-                {new Date(item.preferredTime).toLocaleString("vi-VN")}
-              </Text>
-              <Text style={[styles.status, styles[`status_${item.status}`]]}>
-                Trạng thái: {item.status}
-              </Text>
-              {item.result?.feedback && (
-                <Text style={styles.feedback}>
-                  💬 Phản hồi: {item.result.feedback}
-                </Text>
-              )}
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={24}
-              color={theme.colors.textSecondary}
-            />
-          </View>
-        </Card>
-      </TouchableOpacity>
-    );
+  const handleCompleteTestDrive = async () => {
+    if (!selectedTestDrive || !feedbackData.feedback.trim()) return;
+
+    try {
+      await testDriveService.completeTestDrive(
+        selectedTestDrive._id,
+        feedbackData.feedback,
+        feedbackData.interestRate || undefined
+      );
+      setOpenFeedbackModal(false);
+      setFeedbackData({ feedback: "", interestRate: 0 });
+      loadTestDrives();
+    } catch (error) {
+      console.error("Complete test drive error:", error);
+    }
   };
 
-  if (loading) {
-    return <Loading />;
-  }
+  const renderTestDrive = ({ item }) => (
+    <TouchableOpacity
+      onPress={() => {
+        setSelectedTestDrive(item);
+        if (item.status === "confirmed") setOpenFeedbackModal(true);
+      }}
+    >
+      <Card style={styles.card}>
+        <View style={styles.rowBetween}>
+          <View style={styles.infoContainer}>
+            <Text style={styles.customerName}>
+              {item.customer?.fullName || "Không rõ tên"}
+            </Text>
+            <Text style={styles.customerPhone}>{item.customer?.phone}</Text>
+            <Text style={styles.variantText}>
+              Phiên bản: {item.variant?.trim || "N/A"}
+            </Text>
+            <Text style={styles.timeText}>
+              Thời gian: {new Date(item.preferredTime).toLocaleString("vi-VN")}
+            </Text>
+            <Text style={[styles.status, styles[`status_${item.status}`]]}>
+              Trạng thái: {item.status}
+            </Text>
+            {item.result?.feedback && (
+              <Text style={styles.feedback}>
+                💬 Phản hồi: {item.result.feedback}
+              </Text>
+            )}
+          </View>
+          <Ionicons
+            name="chevron-forward"
+            size={24}
+            color={theme.colors.textSecondary}
+          />
+        </View>
+      </Card>
+    </TouchableOpacity>
+  );
+
+  if (loading) return <Loading />;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* Search bar */}
       <View style={styles.header}>
-        <View style={styles.searchContainer}>
-          <Input
-            placeholder="Tìm kiếm lịch lái thử..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            style={styles.searchInput}
-          />
-        </View>
-        {/* <Button
+        <TextInput
+          placeholder="Tìm kiếm khách hàng hoặc số điện thoại..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          style={styles.searchInput}
+        />
+        <Button
           title="Tạo lịch lái thử"
           variant="primary"
           size="md"
           onPress={() => navigation.navigate("CreateTestDrive")}
-          style={styles.createButton}
-        /> */}
+          style={{ marginTop: 8 }}
+        />
       </View>
 
+      {/* Test drives list */}
       <FlatList
         data={filteredTestDrives}
         renderItem={renderTestDrive}
         keyExtractor={(item) => item._id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={{ padding: 16 }}
         refreshControl={
-          <RefreshControl
-            refreshing={Boolean(refreshing)}
-            onRefresh={onRefresh}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -155,94 +169,112 @@ const TestDrivesScreen = () => {
               variant="outline"
               size="md"
               onPress={() => navigation.navigate("CreateTestDrive")}
-              style={styles.emptyButton}
             />
           </View>
         }
       />
+
+      {/* Feedback Modal */}
+      <Modal visible={openFeedbackModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Ghi nhận phản hồi</Text>
+            <TextInput
+              placeholder="Nhập phản hồi của khách hàng..."
+              value={feedbackData.feedback}
+              onChangeText={(text) =>
+                setFeedbackData({ ...feedbackData, feedback: text })
+              }
+              multiline
+              style={styles.modalInput}
+            />
+            <TextInput
+              placeholder="Mức độ quan tâm (1-10)"
+              value={String(feedbackData.interestRate)}
+              onChangeText={(text) =>
+                setFeedbackData({ ...feedbackData, interestRate: Number(text) })
+              }
+              keyboardType="numeric"
+              style={styles.modalInput}
+            />
+            <View style={styles.modalButtons}>
+              <Button
+                title="Hủy"
+                variant="outline"
+                onPress={() => setOpenFeedbackModal(false)}
+              />
+              <Button title="Hoàn thành" onPress={handleCompleteTestDrive} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  header: { padding: 16, backgroundColor: theme.colors.backgroundLight },
+  searchInput: {
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
-  header: {
-    padding: theme.spacing.lg,
-    backgroundColor: theme.colors.backgroundLight,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  searchContainer: {
-    marginBottom: theme.spacing.md,
-  },
-  createButton: {
-    marginBottom: 0,
-  },
-  listContent: {
-    padding: theme.spacing.lg,
-  },
-  card: {
-    marginBottom: theme.spacing.md,
-  },
+  card: { marginBottom: 12 },
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  infoContainer: {
-    flex: 1,
-  },
+  infoContainer: { flex: 1 },
   customerName: {
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.semibold,
+    fontSize: 16,
+    fontWeight: "600",
     color: theme.colors.textPrimary,
   },
-  customerPhone: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
-  },
-  dealerText: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
-  },
-  variantText: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
-  },
-  timeText: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
-  },
-  feedback: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textPrimary,
-    marginTop: theme.spacing.xs,
-  },
-  status: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.medium,
-    marginTop: theme.spacing.xs,
-  },
+  customerPhone: { fontSize: 14, color: theme.colors.textSecondary },
+  variantText: { fontSize: 14, color: theme.colors.textSecondary },
+  timeText: { fontSize: 14, color: theme.colors.textSecondary },
+  feedback: { fontSize: 12, color: theme.colors.textPrimary, marginTop: 4 },
+  status: { fontSize: 14, fontWeight: "500", marginTop: 4 },
   status_done: { color: "green" },
   status_confirmed: { color: "#007AFF" },
   status_requested: { color: "#FF9500" },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: theme.spacing["5xl"],
+    paddingVertical: 64,
   },
   emptyText: {
-    marginTop: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
-    fontSize: theme.typography.fontSize.base,
+    marginVertical: 16,
+    fontSize: 16,
     color: theme.colors.textSecondary,
   },
-  emptyButton: {
-    marginTop: theme.spacing.md,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    padding: 16,
   },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalTitle: { fontSize: 18, fontWeight: "600", marginBottom: 12 },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 12,
+    fontSize: 16,
+  },
+  modalButtons: { flexDirection: "row", justifyContent: "space-between" },
 });
 
 export default TestDrivesScreen;

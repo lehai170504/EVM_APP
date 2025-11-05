@@ -17,21 +17,13 @@ export const StatusBadge = ({ status, style }) => {
       confirmed: { color: theme.colors.statusConfirmed, label: "Đã xác nhận" },
       allocated: { color: theme.colors.statusConfirmed, label: "Đã phân bổ" },
       invoiced: { color: theme.colors.info, label: "Đã xuất hóa đơn" },
-      delivered: { color: theme.colors.statusCompleted, label: "Đã giao" },
       cancelled: { color: theme.colors.statusCancelled, label: "Đã hủy" },
       completed: { color: theme.colors.statusCompleted, label: "Hoàn tất" },
 
-      // Trạng thái Order liên quan đến Delivery
-      "delivery-pending": {
-        color: theme.colors.warning,
-        label: "Chờ giao hàng",
-      },
-      "on-delivery": { color: theme.colors.primary, label: "Đang giao" },
-
       // Trạng thái Delivery
       pending: { color: theme.colors.statusPending, label: "Chờ lấy hàng" },
-      "picked-up": { color: theme.colors.warning, label: "Đã lấy hàng" },
-      in_progress: { color: theme.colors.info, label: "Đang vận chuyển" }, // Đổi nhãn cho rõ ràng hơn
+      in_progress: { color: theme.colors.info, label: "Đang vận chuyển" },
+      delivered: { color: theme.colors.statusCompleted, label: "Đã giao" },
     };
     return (
       configs[status] || { color: theme.colors.textSecondary, label: status }
