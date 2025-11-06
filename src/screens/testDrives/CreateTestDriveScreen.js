@@ -92,16 +92,29 @@ const CreateTestDriveScreen = () => {
           dealerService.getDealers(),
         ]);
 
+        const uniqueVariants = [];
+        const seenNames = new Set();
+
+        (vehiclesData?.data || vehiclesData || []).forEach((v) => {
+          const name =
+            v.model?.name ||
+            v.variantName ||
+            v.trim ||
+            v.name ||
+            `Xe #${v._id.slice(-4)}`;
+          if (!seenNames.has(name)) {
+            seenNames.add(name);
+            uniqueVariants.push({ _id: v._id, name });
+          }
+        });
+
         setData({
           customers: (customersData?.data || customersData || []).map((c) => ({
             _id: c._id,
             fullName: c.fullName,
             phone: c.phone,
           })),
-          variants: (vehiclesData?.data || vehiclesData || []).map((v) => ({
-            _id: v._id,
-            name: v.trim || v.model?.name || `Phiên bản #${v._id.slice(-4)}`,
-          })),
+          variants: uniqueVariants,
           dealers: (dealersData?.data || dealersData || []).map((d) => ({
             _id: d._id,
             name: d.name || d.dealerName || `Đại lý #${d._id.slice(-4)}`,
@@ -215,10 +228,7 @@ const CreateTestDriveScreen = () => {
                 <TouchableOpacity
                   style={styles.modalItem}
                   onPress={() => {
-                    handleChange(
-                      selectModal.type,
-                      item._id || item.value // ✅ dùng _id cho API data, value cho status
-                    );
+                    handleChange(selectModal.type, item._id || item.value);
                     setSelectModal({ visible: false, type: "" });
                   }}
                 >
@@ -284,6 +294,15 @@ const CreateTestDriveScreen = () => {
           value={selectedStatus?.label || ""}
           onPress={() => setSelectModal({ visible: true, type: "status" })}
         />
+
+        <View style={styles.selectionContainer}>
+          <Text style={styles.label}>Nhân viên phụ trách</Text>
+          <View style={[styles.selectionInput, { backgroundColor: "#f5f5f5" }]}>
+            <Text style={styles.selectionText}>
+              {user?.fullName || user?.email || "Không xác định"}
+            </Text>
+          </View>
+        </View>
 
         <Text style={styles.label}>Thời gian mong muốn*</Text>
         <TouchableOpacity

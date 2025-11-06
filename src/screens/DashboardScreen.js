@@ -341,6 +341,12 @@ const DashboardScreen = () => {
               color={theme.colors.warning}
               onPress={() => navigation.navigate("Customers")}
             />
+            <QuickActionButton
+              icon="chatbubble-ellipses-outline"
+              label="Feedback"
+              color={theme.colors.success}
+              onPress={() => navigation.navigate("Feedback")}
+            />
           </View>
         </View>
       </ScrollView>

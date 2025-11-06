@@ -1,6 +1,6 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authService } from '../services/authService';
+import React, { createContext, useState, useEffect, useContext } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { authService } from "../services/authService";
 
 const AuthContext = createContext();
 
@@ -14,22 +14,24 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const userData = await AsyncStorage.getItem('user');
-      if (userData) {
-        setUser(JSON.parse(userData));
-        // Verify token is still valid
+      const storedUser = await AsyncStorage.getItem("user");
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+
+        // ✅ Xác minh token còn hợp lệ
         try {
           const me = await authService.getMe();
           setUser(me);
+          await AsyncStorage.setItem("user", JSON.stringify(me));
         } catch (error) {
-          // Token invalid, clear storage
-          await AsyncStorage.removeItem('user');
-          await AsyncStorage.removeItem('token');
+          await AsyncStorage.removeItem("user");
+          await AsyncStorage.removeItem("token");
           setUser(null);
         }
       }
     } catch (error) {
-      console.error('Auth check error:', error);
+      console.error("Auth check error:", error);
     } finally {
       setLoading(false);
     }
@@ -37,36 +39,46 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const { user: userData } = await authService.login(email, password);
+      const res = await authService.login(email, password);
+      const userData = res.user;
       setUser(userData);
+      await AsyncStorage.setItem("user", JSON.stringify(userData));
+      await AsyncStorage.setItem("token", res.token);
       return { success: true, user: userData };
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.message || 'Đăng nhập thất bại',
+        error: error.response?.data?.message || "Đăng nhập thất bại",
       };
     }
   };
 
   const logout = async () => {
-    await authService.logout();
-    setUser(null);
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.warn("Logout error:", error);
+    } finally {
+      await AsyncStorage.removeItem("user");
+      await AsyncStorage.removeItem("token");
+      setUser(null);
+    }
   };
 
-  const updateUser = (userData) => {
+  const updateUser = async (userData) => {
     setUser(userData);
-    AsyncStorage.setItem('user', JSON.stringify(userData));
+    await AsyncStorage.setItem("user", JSON.stringify(userData));
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        loading: !!loading,
+        loading,
         login,
         logout,
         updateUser,
-        isAuthenticated: Boolean(user),
+        isAuthenticated: !!user,
       }}
     >
       {children}
@@ -77,8 +89,7 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
-

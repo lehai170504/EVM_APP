@@ -27,6 +27,8 @@ import CreateCustomerScreen from "../screens/customers/CreateCustomerScreen";
 import ReportsScreen from "../screens/ReportsScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import VehicleComparisonResultScreen from "../screens/vehicles/VehicleComparisonResultScreen";
+import FeedbackScreen from "../screens/feedbacks/FeedbackScreen";
+import CreateFeedbackScreen from "../screens/feedbacks/CreateFeedbackScreen";
 
 // Test Drive Screens
 import TestDrivesScreen from "../screens/testDrives/TestDrivesScreen";
@@ -250,6 +252,16 @@ const AppNavigator = () => {
             <Stack.Screen
               name="VehicleComparisonResult"
               component={VehicleComparisonResultScreen}
+            />
+            <Stack.Screen
+              name="Feedback"
+              component={FeedbackScreen}
+              options={{ title: "Phản hồi khách hàng" }}
+            />
+            <Stack.Screen
+              name="CreateFeedback"
+              component={CreateFeedbackScreen}
+              options={{ title: "Tạo phản hồi" }}
             />
           </>
         )}
