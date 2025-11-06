@@ -144,7 +144,19 @@ const FeedbackScreen = () => {
     <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Ionicons
+            name="arrow-back"
+            size={22}
+            color={theme.colors.textPrimary}
+          />
+        </TouchableOpacity>
+
         <Text style={styles.title}>Phản hồi khách hàng</Text>
+
         <Button
           title="Tạo phản hồi"
           variant="primary"
@@ -190,7 +202,8 @@ const FeedbackScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   header: {
-    padding: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
     backgroundColor: theme.colors.backgroundLight,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
@@ -198,7 +211,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  backButton: {
+    marginRight: theme.spacing.md,
+  },
   title: {
+    flex: 1,
+    textAlign: "center",
     fontSize: theme.typography.fontSize.lg,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.textPrimary,
