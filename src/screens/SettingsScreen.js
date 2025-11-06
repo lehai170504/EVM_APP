@@ -226,7 +226,7 @@ const SettingsScreen = () => {
             />
             <Button
               title="Đổi mật khẩu"
-              variant="secondary"
+              variant="primary"
               onPress={handleChangePassword}
               loading={loading}
               fullWidth

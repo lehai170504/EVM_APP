@@ -327,7 +327,7 @@ const DashboardScreen = () => {
               icon="cart"
               label="New Order"
               color={theme.colors.accent}
-              onPress={() => navigation.navigate("CreateOrder")}
+              onPress={() => navigation.navigate("Orders")}
             />
             <QuickActionButton
               icon="document-text"
