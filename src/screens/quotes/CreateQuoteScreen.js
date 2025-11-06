@@ -68,69 +68,34 @@ const CreateQuoteScreen = ({ navigation }) => {
       0
     );
 
-    // 2. Tính Promotion Total (Có kiểm tra điều kiện Scope)
+    // 2. Tính Promotion Total
     let promoTotal = 0;
 
     if (selectedPromotion && sub > 0) {
       const promotion = selectedPromotion;
-      let applicable = true;
       let calculatedDiscount = 0;
 
-      // --- 2.1. Kiểm tra Scope ---
-      if (promotion.scope === "byDealer") {
-        // Giả định: dealerId của khuyến mãi phải khớp với dealerId của khách hàng
-        // LƯU Ý: Nếu selectedCustomer.dealerId không tồn tại, KHUYẾN MÃI NÀY SẼ KHÔNG ÁP DỤNG
-        const customerDealerId = selectedCustomer?.dealerId;
-        const dealerIdsInPromo = promotion.dealers?.map((d) => d._id) || [];
-
-        if (!customerDealerId || !dealerIdsInPromo.includes(customerDealerId)) {
-          applicable = false;
-        }
-      } else if (promotion.scope === "byVariant") {
-        // Kiểm tra xem ít nhất một sản phẩm trong báo giá có nằm trong danh sách 'variants' của khuyến mãi không
-        const promoVariantIds = promotion.variants?.map((v) => v._id) || [];
-        const itemsInQuoteVariantIds = items
-          .map((item) => item.variant)
-          .filter((id) => id); // Lọc bỏ id rỗng
-
-        const isAnyItemCovered = itemsInQuoteVariantIds.some((itemId) =>
-          promoVariantIds.includes(itemId)
-        );
-
-        if (!isAnyItemCovered) {
-          applicable = false;
-        }
-      }
-      // --- 2.2. Kiểm tra Ngày Hết Hạn (Làm thêm 1 lần nữa để đảm bảo) ---
       const now = new Date();
-      if (promotion.validTo && now > new Date(promotion.validTo)) {
-        applicable = false;
-      }
+      const isValid = !promotion.validTo || now <= new Date(promotion.validTo);
 
-      // 2.3. Tính toán giảm giá nếu hợp lệ
-      if (applicable) {
-        if (promotion.discountAmount) {
+      if (isValid) {
+        if (promotion.value) {
+          // Áp dụng trực tiếp value nếu có
+          calculatedDiscount = Math.min(promotion.value, sub);
+        } else if (promotion.discountAmount) {
           calculatedDiscount = Math.min(promotion.discountAmount, sub);
         } else if (promotion.discountPercent) {
           calculatedDiscount = (sub * promotion.discountPercent) / 100;
-        } else if (promotion.type === "accessory" && promotion.value) {
-          // Tạm thời coi value của 'accessory' là giảm giá tiền mặt
-          calculatedDiscount = Math.min(promotion.value, sub);
         }
-
-        promoTotal = calculatedDiscount;
-
-        // Nếu đã áp dụng, không cần cảnh báo. Nếu không áp dụng, logic bên dưới sẽ xử lý
-      } else {
-        // Có khuyến mãi được chọn, nhưng không áp dụng được
-        promoTotal = 0;
       }
+
+      promoTotal = calculatedDiscount;
     }
 
     setSubtotal(sub);
     setPromotionTotal(promoTotal);
 
-    // 3. Tính Tổng cộng (Total)
+    // 3. Tính Tổng cộng
     const totalAmount =
       sub -
       promoTotal +
@@ -139,7 +104,7 @@ const CreateQuoteScreen = ({ navigation }) => {
       (fees.delivery || 0);
 
     setTotal(totalAmount);
-  }, [items, fees, selectedPromotion, selectedCustomer]); // Dependency list đầy đủ
+  }, [items, fees, selectedPromotion]);
 
   useEffect(() => {
     recalculateTotals();
@@ -241,30 +206,11 @@ const CreateQuoteScreen = ({ navigation }) => {
       );
       return;
     }
-
-    // Kiểm tra nhanh lại xem promotionTotal có đang bị lỗi không
-    if (selectedPromotion && promotionTotal === 0 && subtotal > 0) {
-      Alert.alert(
-        "Cảnh báo Khuyến mãi",
-        `Khuyến mãi "${selectedPromotion.name}" được chọn nhưng không được áp dụng do không thỏa mãn điều kiện (Scope hoặc Hết hạn). Bạn có muốn tiếp tục tạo báo giá không?`,
-        [
-          { text: "Hủy", style: "cancel" },
-          { text: "Tiếp tục", onPress: () => proceedSubmit() },
-        ]
-      );
-      return;
-    }
-
-    // Nếu không có cảnh báo hoặc đã đồng ý cảnh báo
     proceedSubmit();
   };
 
   const proceedSubmit = async () => {
     setSubmitting(true);
-
-    // LƯU Ý QUAN TRỌNG:
-    // Chúng ta sử dụng state subtotal, promotionTotal, và total đã được tính toán
-    // chính xác trong useEffect (bao gồm cả kiểm tra Scope).
 
     try {
       const quoteData = {
@@ -273,17 +219,26 @@ const CreateQuoteScreen = ({ navigation }) => {
           variant: item.variant,
           ...(item.color && { color: item.color }),
           qty: item.qty,
-          unitPrice: item.unitPrice, // UnitPrice ĐÃ BAO GỒM PHỤ PHÍ MÀU
+          unitPrice: item.unitPrice,
         })),
         subtotal,
         discount: 0,
-        promotion: selectedPromotion ? selectedPromotion._id : undefined, // Gửi ID khuyến mãi đã chọn
-        promotionTotal: promotionTotal, // Giảm giá thực tế đã kiểm tra
+        promotion: selectedPromotion
+          ? {
+              _id: selectedPromotion._id,
+              name: selectedPromotion.name,
+              type: selectedPromotion.type,
+              discountAmount: selectedPromotion.discountAmount,
+              discountPercent: selectedPromotion.discountPercent,
+              value: selectedPromotion.value,
+              appliedAmount: promotionTotal,
+            }
+          : undefined,
+        promotionTotal: promotionTotal,
         fees,
         total: total, // Tổng đã trừ giảm giá thực tế
         ...(validUntil && { validUntil: validUntil.toISOString() }),
         ...(notes.trim() && { notes: notes.trim() }),
-        // ... (Thông tin dealer nếu cần)
       };
 
       const result = await quoteService.createQuote(quoteData);
