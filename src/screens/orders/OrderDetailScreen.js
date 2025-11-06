@@ -291,7 +291,7 @@ const OrderDetailScreen = ({ route }) => {
   const expectedDeliveryDate = expectedDelivery
     ? format(new Date(expectedDelivery), "dd/MM/yyyy HH:mm")
     : "Chưa xác định";
-  const showDeliveryForm = status === "allocated";
+  const showDeliveryForm = status === "allocated" || status === "invoiced";
   const canInvoiceOrder = status === "allocated";
 
   return (
@@ -423,32 +423,34 @@ const OrderDetailScreen = ({ route }) => {
         )}
 
         {/* HIỂN THỊ TRẠNG THÁI GIAO HÀNG — CHỈ KHI ĐÃ TẠO DELIVERY */}
-        {delivery?._id && (
-          <Card>
-            <Text style={styles.cardTitle}>Trạng thái giao hàng</Text>
-            <StatusBadge status={delivery.status} />
+        {delivery?._id &&
+          (delivery.status === "pending" ||
+            delivery.status === "in_progress") && (
+            <Card>
+              <Text style={styles.cardTitle}>Trạng thái giao hàng</Text>
+              <StatusBadge status={delivery.status} />
 
-            {delivery.status === "pending" && (
-              <Button
-                title="Bắt đầu giao hàng"
-                variant="secondary"
-                fullWidth
-                style={{ marginTop: theme.spacing.md }}
-                onPress={() => handleUpdateDeliveryStatus("in_progress")}
-              />
-            )}
+              {delivery.status === "pending" && (
+                <Button
+                  title="Bắt đầu giao hàng"
+                  variant="secondary"
+                  fullWidth
+                  style={{ marginTop: theme.spacing.md }}
+                  onPress={() => handleUpdateDeliveryStatus("in_progress")}
+                />
+              )}
 
-            {delivery.status === "in_progress" && (
-              <Button
-                title="Đánh dấu đã giao"
-                variant="primary"
-                fullWidth
-                style={{ marginTop: theme.spacing.md }}
-                onPress={() => handleUpdateDeliveryStatus("delivered")}
-              />
-            )}
-          </Card>
-        )}
+              {delivery.status === "in_progress" && (
+                <Button
+                  title="Đánh dấu đã giao"
+                  variant="primary"
+                  fullWidth
+                  style={{ marginTop: theme.spacing.md }}
+                  onPress={() => handleUpdateDeliveryStatus("delivered")}
+                />
+              )}
+            </Card>
+          )}
       </ScrollView>
     </SafeAreaView>
   );
