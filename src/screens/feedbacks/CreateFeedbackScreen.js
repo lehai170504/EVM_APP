@@ -26,7 +26,6 @@ const CreateFeedbackScreen = () => {
   const [submitting, setSubmitting] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // 🔹 Load danh sách khách hàng
   useEffect(() => {
     loadCustomers();
   }, []);
@@ -43,7 +42,6 @@ const CreateFeedbackScreen = () => {
     }
   };
 
-  // 🔹 Gửi feedback
   const handleSubmit = async () => {
     if (!selectedCustomer || !content.trim()) {
       Alert.alert(
@@ -84,7 +82,21 @@ const CreateFeedbackScreen = () => {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>Tạo phản hồi mới</Text>
+        {/* 🔹 Header có nút Back */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color={theme.colors.textPrimary}
+            />
+          </TouchableOpacity>
+          <Text style={styles.title}>Tạo phản hồi mới</Text>
+          <View style={{ width: 24 }} />
+        </View>
 
         {/* 🔹 Chọn khách hàng */}
         <Text style={styles.label}>Khách hàng</Text>
@@ -165,11 +177,19 @@ const styles = StyleSheet.create({
   content: {
     padding: theme.spacing.lg,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: theme.spacing.lg,
+  },
+  backButton: {
+    padding: 6,
+  },
   title: {
     fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.lg,
   },
   label: {
     fontSize: theme.typography.fontSize.sm,
