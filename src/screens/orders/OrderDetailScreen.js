@@ -433,7 +433,7 @@ const OrderDetailScreen = ({ route }) => {
               {delivery.status === "pending" && (
                 <Button
                   title="Bắt đầu giao hàng"
-                  variant="secondary"
+                  variant="primary"
                   fullWidth
                   style={{ marginTop: theme.spacing.md }}
                   onPress={() => handleUpdateDeliveryStatus("in_progress")}
